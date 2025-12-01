@@ -1,4 +1,13 @@
-HELP.md
+# Ignore everything first
+*
+
+# But track these specific files and directories
+!src/
+!pom.xml
+!README.md
+!.gitignore
+
+# Standard Java/Maven exclusions (for files inside src that should be ignored)
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -31,3 +40,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Additional files to ignore
+HELP.md
+*.json
+*.ps1
+mvnw
+mvnw.cmd
