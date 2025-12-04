@@ -33,8 +33,32 @@ Thumbs.db
 mvnw
 mvnw.cmd
 
-# Ignore large or temporary test reports (optional)
-# Uncomment if you want to exclude these:
-# comprehensive_rbac_test_report_*.txt
-# api_test_report_*.txt
-# rbac_test_report_*.txt
+# Test Files and Reports (DO NOT UPLOAD TO GIT)
+test_*.ps1
+test_*.json
+*_test.ps1
+*_test.txt
+*.sql
+RBAC_TEST_*.ps1
+rbac_*.ps1
+rbac_test*.txt
+rbac_test_report*.txt
+api_test_report*.txt
+comprehensive_*.ps1
+comprehensive_rbac*.txt
+all_scenarios_test.ps1
+final_rbac_test.ps1
+setup_superadmin.sh
+update_temp.sql
+
+# Test Reports and Documentation (DO NOT UPLOAD TO GIT)
+FINAL_TEST_REPORT*.md
+JWT_TEST_REPORT.md
+JWT_IMPLEMENTATION_SUMMARY.md
+JWT_QUICK_REFERENCE.md
+JWT_RBAC_IMPLEMENTATION_COMPLETE.md
+RBAC_TEST_FINAL_REPORT.txt
+RBAC_TEST_REPORT_FINAL.txt
+SWAGGER_TESTING_GUIDE.md
+HELP.md
+comprehensive_rbac_test_report*.txt
