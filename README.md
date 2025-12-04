@@ -1,85 +1,240 @@
 # Event Management System
 
-A Spring Boot-based REST API for managing events, built with Java and following best practices for enterprise application development.
+A comprehensive Spring Boot-based REST API for managing events with enterprise-grade security features, role-based access control, and JWT authentication.
 
-## Table of Contents
+## 🎯 Table of Contents
 
 - [Features](#features)
+- [Security Architecture](#security-architecture)
 - [Technologies Used](#technologies-used)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
+- [Authentication & Authorization](#authentication--authorization)
 - [API Endpoints](#api-endpoints)
 - [Testing](#testing)
+- [Security Documentation](#security-documentation)
 - [Contributing](#contributing)
 
-## Features
+## ✨ Features
 
-- CRUD operations for event management
-- RESTful API design
-- DTO pattern for request/response handling
-- Global exception handling
-- Swagger/OpenAPI documentation
-- JPA/Hibernate for data persistence
-- Maven build system
-- Unit testing framework
+### Core Features
+- ✅ CRUD operations for event management
+- ✅ RESTful API design with DTO pattern
+- ✅ Global exception handling
+- ✅ Swagger/OpenAPI 3 documentation
+- ✅ JPA/Hibernate data persistence
+- ✅ MySQL database integration
+- ✅ Maven build system
+- ✅ Unit & Integration testing
+
+### Security Features
+- 🔐 **JWT Authentication** (HS512 signed tokens)
+- 🔑 **BCrypt Password Hashing** (strength 12)
+- 👥 **Role-Based Access Control (RBAC)**
+- ✅ **Server-Side Token Caching** (enables logout)
+- 🛡️ **Token Expiration** (45-minute access tokens, 7-day refresh tokens)
+- 🔒 **Permission-Based Authorization** (@PreAuthorize support)
+- 📋 **Audit Trail** (created_at, updated_at timestamps)
 
 ## Technologies Used
 
-- **Java 17+**
-- **Spring Boot 3.x**
-- **Spring Web**
-- **Spring Data JPA**
-- **MySQL Database** (for development and production)
-- **Swagger/OpenAPI 3**
-- **Maven**
-- **JUnit 5**
+### Backend Framework
+- **Java 17+** - Latest LTS version
+- **Spring Boot 3.x** - REST API framework
+- **Spring Web** - Web layer
+- **Spring Data JPA** - ORM/Persistence
+- **Spring Security 6.2.8** - Authentication & Authorization
+
+### Database & Persistence
+- **MySQL 8.0+** - Relational database
+- **Hibernate** - ORM framework
+- **Flyway/Liquibase** - Database migrations
+
+### Security
+- **JJWT 0.12.3** - JWT token library
+- **BCrypt** - Password hashing
+- **Spring Security** - Authorization framework
+
+### API & Documentation
+- **Swagger/OpenAPI 3** - API documentation
+- **Spring Boot Actuator** - Health checks
+
+### Testing
+- **JUnit 5** - Unit testing
+- **Mockito** - Mocking framework
+- **Spring Boot Test** - Integration testing
+
+### Build & DevOps
+- **Maven** - Build automation
+- **Git** - Version control
+- **Docker** - Containerization (optional)
 
 ## Project Structure
 
 ```
 src/main/java/com/event_management_system/
 ├── config/                 # Configuration classes
-│   └── SwaggerConfig.java  # Swagger documentation configuration
+│   ├── SwaggerConfig.java  # Swagger documentation
+│   └── SecurityConfig.java # Spring Security configuration
 ├── controller/             # REST controllers
-│   └── EventController.java
+│   ├── AuthController.java # Authentication endpoints
+│   ├── UserController.java # User management
+│   ├── RoleController.java # Role management
+│   ├── PermissionController.java # Permission management
+│   └── EventController.java # Event management
 ├── dto/                    # Data Transfer Objects
+│   ├── LoginRequestDTO.java
+│   ├── AuthResponseDTO.java
+│   ├── UserRequestDTO.java
+│   ├── UserResponseDTO.java
+│   ├── RoleDTO.java
+│   ├── PermissionDTO.java
 │   ├── EventRequestDTO.java
 │   └── EventResponseDTO.java
 ├── entity/                 # JPA entities
-│   ├── BaseEntity.java
+│   ├── BaseEntity.java     # Abstract base with timestamps
+│   ├── User.java
+│   ├── Role.java
+│   ├── Permission.java
+│   ├── RolePermission.java
 │   └── Event.java
+├── enums/                  # Enumeration classes
+│   └── RoleType.java
 ├── exception/              # Exception handling
-│   └── GlobalExceptionHandler.java
+│   ├── GlobalExceptionHandler.java
+│   └── Custom exceptions
 ├── mapper/                 # Object mapping utilities
-│   └── EventMapper.java
+│   ├── EventMapper.java
+│   ├── UserMapper.java
+│   └── RoleMapper.java
 ├── repository/             # JPA repositories
+│   ├── UserRepository.java
+│   ├── RoleRepository.java
+│   ├── PermissionRepository.java
 │   └── EventRepository.java
+├── security/               # Security components
+│   ├── JwtService.java     # JWT generation & validation
+│   ├── JwtAuthenticationFilter.java # Authentication filter
+│   ├── TokenCacheService.java # Server-side token cache
+│   └── CustomUserDetailsService.java
 ├── service/                # Business logic
-│   └── EventService.java
+│   ├── AuthService.java    # Authentication service
+│   ├── UserService.java    # User management
+│   ├── RoleService.java    # Role management
+│   ├── EventService.java   # Event management
+│   └── PermissionService.java
 └── EventManagementSystemApplication.java
 ```
+
+## Security Architecture
+
+### Authentication Flow
+
+```
+1. User Login
+   POST /api/auth/login → { email, password }
+   ↓
+2. Credentials Verification
+   - Hash password with BCrypt
+   - Compare with stored hash
+   ↓
+3. Token Generation
+   - Create JWT signed with HS512
+   - Include userId + unique tokenUuid
+   - Set expiration (45 minutes)
+   ↓
+4. Token Caching
+   - Cache tokenUuid in server memory
+   - Map to userId and TTL
+   ↓
+5. Response to Client
+   ← accessToken + refreshToken + user info
+```
+
+### Authorization Flow
+
+```
+1. Protected Request
+   GET /api/users
+   Headers: Authorization: Bearer eyJhbGc...
+   ↓
+2. Token Extraction & Validation
+   - Extract JWT from header
+   - Verify signature hasn't changed
+   - Check if token expired
+   ↓
+3. Token Cache Verification
+   - Lookup tokenUuid in cache
+   - Verify user still logged in (not cached = logged out)
+   ↓
+4. User Loading
+   - Load user from database
+   - Fetch roles and permissions
+   ↓
+5. Authorization Check
+   - @PreAuthorize checks role/permission
+   - Grant or deny access
+   ↓
+6. Response
+   ← 200 OK (if authorized) or 403 Forbidden
+```
+
+### Security Components
+
+| Component | Purpose | Details |
+|-----------|---------|---------|
+| **JwtService** | Token generation & validation | Signs with HS512, extracts claims |
+| **JwtAuthenticationFilter** | Request interception | Runs on every request, validates token |
+| **TokenCacheService** | Server-side logout | Tracks valid tokens in memory |
+| **BCryptPasswordEncoder** | Password hashing | One-way hash with salt (strength 12) |
+| **CustomUserDetailsService** | User loading | Fetches user + authorities from DB |
+| **SecurityConfig** | Spring Security setup | Configures filter chain, CORS, etc. |
+
+
 
 ## Getting Started
 
 ### Prerequisites
 
-- Java 17 or higher
-- Maven 3.6 or higher
+- **Java 17** or higher
+- **Maven 3.6** or higher
+- **MySQL 8.0** or higher
+- **Git** (for version control)
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
-git clone <repository-url>
+git clone https://github.com/shakibbs/Event-Management-System.git
 cd event_management_system
 ```
 
-2. Build the project:
+2. **Setup MySQL Database:**
+```sql
+CREATE DATABASE event_management_db;
+USE event_management_db;
+```
+
+3. **Configure database connection** in `src/main/resources/application.properties`:
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/event_management_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=your_mysql_password
+```
+
+4. **Update JWT Secret** (optional - for production):
+```properties
+app.jwt.secret=your-super-secret-key-minimum-32-characters
+app.jwt.access-token-expiration=2700000  # 45 minutes in milliseconds
+app.jwt.refresh-token-expiration=604800000  # 7 days in milliseconds
+```
+
+5. **Build the project:**
 ```bash
 mvn clean install
 ```
 
-3. Run the application:
+6. **Run the application:**
 ```bash
 mvn spring-boot:run
 ```
@@ -89,30 +244,152 @@ The application will start on `http://localhost:8080`
 ### Accessing API Documentation
 
 Once the application is running, you can access the Swagger UI at:
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+
+## Authentication & Authorization
+
+### How JWT Authentication Works
+
+1. **User logs in** with email and password
+2. **Server validates credentials** using BCrypt
+3. **JWT token is generated** with:
+   - User ID in `sub` claim
+   - Unique token UUID (for logout tracking)
+   - Expiration time (45 minutes for access token)
+4. **Token is cached** server-side for logout support
+5. **Client stores token** and includes in every request
+6. **Filter validates token** on each request:
+   - Verifies signature hasn't been tampered
+   - Checks if token is expired
+   - Verifies token UUID is still in cache (not logged out)
+7. **User authorities loaded** (roles + permissions)
+8. **Request authorized** or denied based on @PreAuthorize rules
+
+### Token Structure
+
+```
+eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidG9rZW5VdWlkIjoiMzc4ZDhhMzAtYzc5Mi00ZjJhLWIyOTAtYTlmZWJiMGI5MWI1IiwiaWF0IjoxNjk2NTQzOTkwLCJleHAiOjE2OTY1NDY2OTB9.signature...
+```
+
+- **Header:** Algorithm (HS512)
+- **Payload:** User ID, Token UUID, Issued At, Expiration
+- **Signature:** HMACSHA512(header.payload, secret)
+
+### Using Authentication in Requests
+
+```bash
+# Login to get token
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@ems.com","password":"password"}'
+
+# Response includes accessToken
+# Use token in subsequent requests:
+curl -X GET http://localhost:8080/api/events \
+  -H "Authorization: Bearer eyJhbGciOiJIUzUxMiJ9..."
+```
+
+### Role-Based Access Control
+
+Roles determine what actions a user can perform:
+
+- **ADMIN** - Full system access (users, roles, events)
+- **ORGANIZER** - Can create and manage events
+- **ATTENDEE** - Can view events
+
+Example:
+```java
+@GetMapping("/users")
+@PreAuthorize("hasRole('ADMIN')")  // Only ADMIN role
+public ResponseEntity<List<UserResponseDTO>> getAllUsers() { ... }
+
+@PostMapping("/events")
+@PreAuthorize("hasAnyRole('ADMIN', 'ORGANIZER')")  // ADMIN or ORGANIZER
+public ResponseEntity<EventResponseDTO> createEvent(...) { ... }
+```
 
 ## API Endpoints
 
+### Authentication
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|----------------|
+| POST | `/api/auth/login` | User login | ❌ No |
+| POST | `/api/auth/refresh` | Refresh access token | ❌ No |
+| POST | `/api/auth/logout` | Logout user (invalidate token) | ✅ Yes |
+
+### User Management
+
+| Method | Endpoint | Description | Role Required |
+|--------|----------|-------------|----------------|
+| GET | `/api/users` | Get all users | ADMIN |
+| GET | `/api/users/{id}` | Get user by ID | ADMIN |
+| POST | `/api/users` | Create new user | ADMIN |
+| PUT | `/api/users/{id}` | Update user | ADMIN |
+| DELETE | `/api/users/{id}` | Delete user | ADMIN |
+
+### Role Management
+
+| Method | Endpoint | Description | Role Required |
+|--------|----------|-------------|----------------|
+| GET | `/api/roles` | Get all roles | ADMIN |
+| POST | `/api/roles` | Create role | ADMIN |
+| PUT | `/api/roles/{id}` | Update role | ADMIN |
+| DELETE | `/api/roles/{id}` | Delete role | ADMIN |
+
 ### Event Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/events` | Get all events |
-| GET | `/api/events/{id}` | Get event by ID |
-| POST | `/api/events` | Create a new event |
-| PUT | `/api/events/{id}` | Update an existing event |
-| DELETE | `/api/events/{id}` | Delete an event |
+| Method | Endpoint | Description | Role Required |
+|--------|----------|-------------|----------------|
+| GET | `/api/events` | Get all events | ATTENDEE |
+| GET | `/api/events/{id}` | Get event by ID | ATTENDEE |
+| POST | `/api/events` | Create new event | ORGANIZER/ADMIN |
+| PUT | `/api/events/{id}` | Update event | ORGANIZER/ADMIN |
+| DELETE | `/api/events/{id}` | Delete event | ADMIN |
 
 ### Request/Response Examples
 
-#### Create Event Request
+#### Login Request
+```json
+POST /api/auth/login
+{
+  "email": "admin@ems.com",
+  "password": "password"
+}
+```
+
+#### Login Response
 ```json
 {
-  "title": "Sample Event",
-  "description": "This is a sample event description",
-  "date": "2024-12-31T23:59:59",
-  "location": "Sample Location"
+  "accessToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwi...",
+  "refreshToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwi...",
+  "tokenType": "Bearer",
+  "expiresIn": 2700,
+  "user": {
+    "id": 1,
+    "email": "admin@ems.com",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": {
+      "id": 1,
+      "name": "ADMIN"
+    }
+  }
+}
+```
+
+#### Create Event Request
+```json
+POST /api/events
+Authorization: Bearer <accessToken>
+{
+  "title": "Tech Conference 2024",
+  "description": "Annual technology conference",
+  "startDate": "2024-12-31T09:00:00",
+  "endDate": "2024-12-31T17:00:00",
+  "location": "Convention Center",
+  "capacity": 500
 }
 ```
 
@@ -120,10 +397,12 @@ Once the application is running, you can access the Swagger UI at:
 ```json
 {
   "id": 1,
-  "title": "Sample Event",
-  "description": "This is a sample event description",
-  "date": "2024-12-31T23:59:59",
-  "location": "Sample Location",
+  "title": "Tech Conference 2024",
+  "description": "Annual technology conference",
+  "startDate": "2024-12-31T09:00:00",
+  "endDate": "2024-12-31T17:00:00",
+  "location": "Convention Center",
+  "capacity": 500,
   "createdAt": "2024-01-01T10:00:00",
   "updatedAt": "2024-01-01T10:00:00"
 }
@@ -131,31 +410,80 @@ Once the application is running, you can access the Swagger UI at:
 
 ## Testing
 
-### Running Tests
+### Running Unit Tests
 
 ```bash
 mvn test
 ```
 
+### Running Integration Tests
+
+```bash
+mvn verify
+```
+
+### API Testing with PowerShell Scripts
+
+The project includes PowerShell scripts for comprehensive API testing:
+
+```bash
+# Test basic API endpoints
+.\test_api.ps1
+
+# Test error scenarios
+.\test_error_scenarios.ps1
+
+# Test RBAC (Role-Based Access Control)
+.\rbac_access_test.ps1
+
+# Comprehensive API testing
+.\comprehensive_api_test.ps1
+```
+
 ### Test Coverage
 
-The project includes unit tests for the main application components. Test files are located in:
+Test files are located in:
 ```
 src/test/java/com/event_management_system/
+├── EventManagementSystemApplicationTests.java
+└── RBACTest.java
 ```
 
-### API Testing Scripts
+### Manual Testing with Swagger
 
-The project includes PowerShell scripts for API testing:
-- `test_api.ps1` - Basic API endpoint testing
-- `test_error_scenarios.ps1` - Error scenario testing
-- `test_event.json` - Sample event data for testing
+1. Start the application
+2. Navigate to http://localhost:8080/swagger-ui.html
+3. Click "Authorize" and enter your JWT token
+4. Test endpoints directly from Swagger UI
+
+## Security Documentation
+
+For detailed security architecture, JWT implementation, and token verification flow, see: **[SECURITY_REPORT.md](./SECURITY_REPORT.md)**
+
+### Key Security Features
+
+✅ **JWT Authentication** - Stateless, signed tokens (HS512)  
+✅ **Server-Side Logout** - Token cache prevents reuse after logout  
+✅ **BCrypt Password Hashing** - Strength 12, salted hashes  
+✅ **Role-Based Access Control** - Fine-grained authorization  
+✅ **Token Expiration** - Access (45 min) and Refresh (7 days)  
+✅ **Signature Verification** - Prevents token tampering  
+✅ **Audit Trail** - Created/Updated timestamps on all entities  
+
+### Security Best Practices
+
+- 🔒 Always use HTTPS in production
+- 🔑 Rotate JWT secret regularly
+- 🛡️ Implement rate limiting on login endpoint
+- 📝 Monitor authentication logs for suspicious activity
+- 🔄 Use refresh tokens for token rotation
+- 🚫 Never store secrets in code (use environment variables)
 
 ## Configuration
 
 ### Database Configuration
 
-The application uses MySQL database. Database settings can be configured in `src/main/resources/application.properties`:
+MySQL database settings in `src/main/resources/application.properties`:
 
 ```properties
 # MySQL Database
@@ -165,28 +493,124 @@ spring.datasource.username=root
 spring.datasource.password=your_password
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
 ```
 
-Note: Make sure to update the password field with your actual MySQL password.
+Note: Update the password field with your actual MySQL password.
+
+### JWT Configuration
+
+```properties
+# JWT Settings
+app.jwt.secret=your-super-secret-key-minimum-32-characters-for-hs512
+app.jwt.access-token-expiration=2700000  # 45 minutes
+app.jwt.refresh-token-expiration=604800000  # 7 days
+```
 
 ### Server Configuration
 
-Default server configuration:
-- Port: 8080
-- Context path: /
+```properties
+# Server Configuration
+server.port=8080
+server.servlet.context-path=/
+
+# Application Name
+spring.application.name=event-management-system
+
+# Logging
+logging.level.root=INFO
+logging.level.com.event_management_system=DEBUG
+```
+
+## Deployment
+
+## Deployment
+
+### Docker Deployment
+
+1. **Build Docker image:**
+```bash
+docker build -t event-management-system:latest .
+```
+
+2. **Run container:**
+```bash
+docker run -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/event_management_db \
+  -e SPRING_DATASOURCE_USERNAME=root \
+  -e SPRING_DATASOURCE_PASSWORD=your_password \
+  -e APP_JWT_SECRET=your-secret-key \
+  event-management-system:latest
+```
+
+### Production Deployment Checklist
+
+- [ ] Use HTTPS (SSL/TLS certificate)
+- [ ] Rotate JWT secret
+- [ ] Set strong MySQL password
+- [ ] Enable Spring Security CSRF protection
+- [ ] Configure CORS for trusted domains only
+- [ ] Implement rate limiting
+- [ ] Enable request logging and monitoring
+- [ ] Use environment variables for secrets
+- [ ] Set appropriate cache TTL values
+- [ ] Configure database backups
+- [ ] Enable health checks (`/actuator/health`)
+- [ ] Monitor error logs
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+We welcome contributions! Please follow these steps:
+
+1. **Fork** the repository
+2. **Create feature branch:**
+```bash
+git checkout -b feature/AmazingFeature
+```
+3. **Make your changes** and commit:
+```bash
+git commit -m 'Add some AmazingFeature'
+```
+4. **Push to branch:**
+```bash
+git push origin feature/AmazingFeature
+```
+5. **Open a Pull Request**
+
+### Code Standards
+
+- Follow Java naming conventions
+- Write unit tests for new features
+- Keep methods focused (single responsibility)
+- Use meaningful variable and method names
+- Add JavaDoc comments for public methods
+- Update README for new features
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Contact
+## Contact & Support
 
-For any questions or suggestions, please open an issue in the repository.
+- **GitHub Issues:** https://github.com/shakibbs/Event-Management-System/issues
+- **Email:** shakib@example.com
+- **Documentation:** See [SECURITY_REPORT.md](./SECURITY_REPORT.md) for detailed security information
+
+## Changelog
+
+### v1.2.0 (Current)
+- ✅ Added JWT Authentication with HS512 signing
+- ✅ Implemented Role-Based Access Control (RBAC)
+- ✅ Added server-side token caching for logout support
+- ✅ Comprehensive security report
+- ✅ Enhanced API endpoints with authentication
+
+### v1.1.0
+- Event CRUD operations
+- Swagger API documentation
+- Global exception handling
+- MySQL persistence
+
+### v1.0.0
+- Initial project setup
+- Basic Spring Boot configuration
