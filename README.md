@@ -97,9 +97,8 @@ src/main/java/com/event_management_system/
 │   ├── Role.java
 │   ├── Permission.java
 │   ├── RolePermission.java
-│   └── Event.java
-├── enums/                  # Enumeration classes
-│   └── RoleType.java
+│   ├── Event.java
+│   └── Event.Visibility    # Event visibility enum (inner enum)
 ├── exception/              # Exception handling
 │   ├── GlobalExceptionHandler.java
 │   └── Custom exceptions
@@ -521,8 +520,6 @@ spring.application.name=event-management-system
 logging.level.root=INFO
 logging.level.com.event_management_system=DEBUG
 ```
-
-## Deployment
 
 ## Deployment
 
