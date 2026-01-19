@@ -53,37 +53,30 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Spring Boot Mail: For sending email notifications -->
-        <!-- Provides: JavaMailSender for SMTP email operations -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- ====================== SECURITY DEPENDENCIES ====================== -->
-        <!-- Spring Security: Core security framework for authentication & authorization -->
-        <!-- Provides: AuthenticationManager, SecurityContextHolder, UserDetailsService -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- JWT (JSON Web Token) - io.jsonwebtoken:jjwt (JJWT library) -->
-        <!-- Used to: Create, validate, and parse JWT tokens -->
-        <!-- API: Contains interfaces -->
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
             <version>0.12.3</version>
         </dependency>
-        <!-- JJWT Implementation: Contains actual implementation -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
             <version>0.12.3</version>
             <scope>runtime</scope>
         </dependency>
-        <!-- JJWT Jackson: For JSON serialization/deserialization in JWT -->
+
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
@@ -91,24 +84,19 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring Boot Caching: For caching token UUIDs and user info -->
-        <!-- Will be configured with Redis later for production use -->
-        <!-- For now, using ConcurrentHashMap as fallback cache -->
-        <!-- TODO: Add spring-boot-starter-data-redis when Redis is ready -->
+      
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
-        <!-- ====================== END SECURITY DEPENDENCIES ====================== -->
 
-        <!-- SpringDoc OpenAPI Documentation (compatible with Spring Boot 3.x) -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.7.0</version>
         </dependency>
-        <!-- MapStruct for mapping between DTOs and entities -->
+
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
@@ -131,7 +119,6 @@
             <scope>test</scope>
         </dependency>
         
-        <!-- JSR-305 Annotations for null safety -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
