@@ -147,7 +147,7 @@ export function Dashboard() {
               leftIcon={<Download className="h-4 w-4" />}> 
               Export Report
             </Button>
-            <Button leftIcon={<Plus className="h-4 w-4" />}>Create Event</Button>
+            <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/events?create=1')}>Create Event</Button>
           </div>
         )}
       </div>

@@ -14,12 +14,12 @@ public class AsyncConfig {
     @Bean(name = "taskExecutor")
     public TaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(10);
-        executor.setMaxPoolSize(20);
-        executor.setQueueCapacity(500);
+        executor.setCorePoolSize(50); // Increased for higher concurrency
+        executor.setMaxPoolSize(100); // Increased for burst loads
+        executor.setQueueCapacity(5000); // Increased to buffer more tasks
         executor.setThreadNamePrefix("invitation-processor-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(60);
+        executor.setAwaitTerminationSeconds(120);
         executor.initialize();
         return executor;
     }

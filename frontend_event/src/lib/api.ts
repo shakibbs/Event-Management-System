@@ -1,3 +1,12 @@
+// Fetch events for the current user (own events)
+export async function fetchOwnEventsApi(): Promise<Event[]> {
+  const data = await apiRequest<any>(`/events/own`, {
+    method: 'GET',
+  });
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.content)) return data.content;
+  return [];
+}
 // Fetch attendees for a specific event (real backend)
 // Fetch single event by ID
 export async function fetchEventApi(eventId: string | number) {

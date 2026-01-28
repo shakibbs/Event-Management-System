@@ -1,3 +1,4 @@
+
 package com.event_management_system.controller;
 
 import java.util.List;
@@ -30,6 +31,7 @@ import com.event_management_system.exception.GlobalExceptionHandler.ResourceNotF
 import com.event_management_system.repository.UserRepository;
 import com.event_management_system.service.ApplicationLoggerService;
 import com.event_management_system.service.EventService;
+import com.event_management_system.service.ReportService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,14 +41,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-
+import net.sf.jasperreports.engine.JRException;
+    
 @RestController
 @RequestMapping("/api/events")
 @Tag(name = "Event Management", description = "APIs for managing events in the system")
 public class EventController {
-
-
-
 
 
         @Autowired
@@ -58,6 +58,8 @@ public class EventController {
         @Autowired
         private ApplicationLoggerService log;
 
+        @Autowired
+        private ReportService reportService;
 
 
         @PostMapping
@@ -473,6 +475,38 @@ public class EventController {
                 } catch (Exception e) {
                         log.error("Failed to reactivate event: eventId={}", eventId, e);
                         throw e;
+                }
+        }
+        @GetMapping(value = "/download/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+        @Operation(summary = "Download events as PDF", description = "Downloads a PDF of all events visible to the current user, filtered by role.")
+        public ResponseEntity<byte[]> downloadEventsPdf(Authentication authentication) {
+                try {
+                        log.info("PDF export endpoint called. Authentication: {}", authentication);
+                        if (authentication == null) {
+                                log.warn("No authentication provided to /api/events/download/pdf");
+                        } else {
+                                log.info("Authenticated principal: {} (authorities: {})", authentication.getName(), authentication.getAuthorities());
+                        }
+
+                        String email = authentication.getName();
+                        User currentUser = userRepository.findByEmail(email)
+                                        .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+
+                        List<EventResponseDTO> visibleEvents = eventService.getEventsForUser(currentUser.getId());
+
+                        java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+                        parameters.put("generatedBy", currentUser.getFullName());
+                        parameters.put("generatedAt", java.time.LocalDateTime.now().toString());
+
+                        byte[] pdfBytes = reportService.generateEventsPdf(visibleEvents, parameters);
+
+                        return ResponseEntity.ok()
+                                        .header("Content-Disposition", "attachment; filename=events_list.pdf")
+                                        .contentType(MediaType.APPLICATION_PDF)
+                                        .body(pdfBytes);
+                } catch (JRException e) {
+                        log.error("Failed to generate PDF report", e);
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
                 }
         }
 }

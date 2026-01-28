@@ -60,7 +60,7 @@ export function ActivityList() {
 
   // Fetch all users for SuperAdmin
   useEffect(() => {
-    if (user && user.roles && user.roles.includes('SuperAdmin')) {
+    if (user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin'))) {
       apiRequest('/users?size=1000')
         .then((data) => {
           setUsers(Array.isArray(data) ? data : (data.content || []));
@@ -72,7 +72,7 @@ export function ActivityList() {
   // Build API URL based on filters and role
   function buildApiUrl() {
     // SuperAdmin: can filter by user, type, date
-    if (user && user.roles && user.roles.includes('SuperAdmin')) {
+    if (user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin'))) {
       if (activityType) {
         return `/history/activity/type/${activityType}` + (selectedUserId ? `?userId=${selectedUserId}` : '');
       }
@@ -132,7 +132,7 @@ export function ActivityList() {
         <div className="bg-surface rounded-xl shadow-md p-6 border border-surface-tertiary mb-8 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* SuperAdmin user filter */}
-            {user && user.roles && user.roles.includes('SuperAdmin') && (
+            {user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin')) && (
               <div className="flex flex-col">
                 <label htmlFor="userFilter" className="text-sm font-semibold text-primary mb-2">User</label>
                 <select

@@ -16,6 +16,7 @@ export default function EventManagement() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteFile, setInviteFile] = useState<File | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{message?: string; total?: number} | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -169,33 +170,23 @@ export default function EventManagement() {
     setShowInviteModal(true);
   };
 
+  // (Removed duplicate handleInviteSubmit)
+
   const handleInviteSubmit = async () => {
-    if (!eventId) return;
     setInviteLoading(true);
+    setInviteResult(null);
     try {
-      await inviteUserApi(eventId, inviteFile || undefined);
-      alert('Invitations sent!');
-      setShowInviteModal(false);
-      setInviteFile(null);
+      const result = await inviteUserApi(eventId, inviteFile || undefined);
+      setInviteResult({
+        message: result?.message || 'Bulk invitations submitted for processing',
+        total: result?.total
+      });
+      // Optionally, you can close the modal after a delay, or let user close it manually
+      // setTimeout(() => setShowInviteModal(false), 3000);
     } catch (err: any) {
-      alert('Failed to send invitations: ' + (err?.message || 'Unknown error'));
+      setInviteResult({ message: 'Failed to send invitations: ' + (err?.message || 'Unknown error') });
     } finally {
       setInviteLoading(false);
-    }
-  };
-
-  const handleEditSubmit = async () => {
-    if (!eventId) return;
-    setEditLoading(true);
-    try {
-      await updateEventApi(eventId, editForm);
-      alert('Event updated successfully!');
-      setShowEditModal(false);
-      window.location.reload();
-    } catch (err: any) {
-      alert('Failed to update event: ' + (err?.message || 'Unknown error'));
-    } finally {
-      setEditLoading(false);
     }
   };
 
@@ -506,7 +497,7 @@ export default function EventManagement() {
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Mail className="w-5 h-5" /> Send Invitations
               </h3>
-              <button className="text-white hover:text-accent-light text-2xl" onClick={() => setShowInviteModal(false)}>×</button>
+              <button className="text-white hover:text-accent-light text-2xl" onClick={() => { setShowInviteModal(false); setInviteResult(null); }}>&times;</button>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -532,10 +523,18 @@ export default function EventManagement() {
                   </div>
                 )}
               </div>
+              {inviteResult && (
+                <div className={`mt-4 p-3 rounded-lg text-sm ${inviteResult.message?.startsWith('Failed') ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  <div>{inviteResult.message}</div>
+                  {typeof inviteResult.total === 'number' && (
+                    <div>Total invitations: <b>{inviteResult.total}</b></div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="border-t border-slate-200 px-6 py-4 flex gap-3 justify-end">
-              <Button onClick={() => setShowInviteModal(false)} variant="secondary">Cancel</Button>
-              <Button onClick={handleInviteSubmit} isLoading={inviteLoading} leftIcon={<Mail className="w-4 h-4" />}>
+              <Button onClick={() => { setShowInviteModal(false); setInviteResult(null); }} variant="secondary">Cancel</Button>
+              <Button onClick={handleInviteSubmit} isLoading={inviteLoading} leftIcon={<Mail className="w-4 h-4" />} disabled={inviteLoading}>
                 Send Invitations
               </Button>
             </div>

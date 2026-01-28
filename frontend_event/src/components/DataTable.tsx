@@ -65,6 +65,12 @@ export function DataTable({ data, isLoading, onEdit, onDelete, renderActions, on
                 Attendees
               </th>
               <th className="py-4 px-6 text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                Approval Status
+              </th>
+              <th className="py-4 px-6 text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                Visibility
+              </th>
+              <th className="py-4 px-6 text-xs font-semibold text-text-secondary uppercase tracking-wider">
                 Status
               </th>
             </tr>
@@ -137,6 +143,12 @@ export function DataTable({ data, isLoading, onEdit, onDelete, renderActions, on
                     />
 
                   </div>
+                </td>
+                <td className="py-4 px-6">
+                  <Badge status={(event as any)?.approvalStatus || (event as any)?.approval_status || 'PENDING'} />
+                </td>
+                <td className="py-4 px-6">
+                  <Badge status={(event as any)?.visibility || 'PUBLIC'} />
                 </td>
                 <td className="py-4 px-6">
                   <Badge status={event.eventStatus || event.status} />

@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Event } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Plus } from 'lucide-react';
-import { fetchEventsApi, apiRequest } from '../lib/api';
+import { fetchEventsApi, fetchOwnEventsApi, apiRequest } from '../lib/api';
 
 // Local type definitions
 interface FilterState {
@@ -14,27 +14,47 @@ interface FilterState {
   status: string;
   dateRange: string;
   ownOnly?: boolean;
+  approvalStatus?: string;
+  visibility?: string;
 }
+
+import { useLocation } from 'react-router-dom';
 
 export function EventsList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     status: 'all',
-    dateRange: 'all'
+    dateRange: 'all',
+    approvalStatus: 'all',
+    visibility: 'all'
   });
   // Modal state for create/edit
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [eventForm, setEventForm] = useState<Partial<Event>>({ title: '', location: '', startTime: '', endTime: '', description: '' });
+  const [eventForm, setEventForm] = useState<Partial<Event>>({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+
+  // Open modal if redirected from dashboard with ?create=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') === '1') {
+      setShowModal(true);
+      setEditMode(false);
+      setSelectedEvent(null);
+      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+      // Remove the query param from URL after opening
+      navigate('/events', { replace: true });
+    }
+  }, [location.search, navigate]);
   // CRUD Handlers
   const handleCreate = () => {
     setShowModal(true);
     setEditMode(false);
     setSelectedEvent(null);
-    setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '' });
+    setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
   };
 
   const handleDelete = async (event: Event) => {
@@ -78,7 +98,7 @@ export function EventsList() {
       setShowModal(false);
       setEditMode(false);
       setSelectedEvent(null);
-      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '' });
+      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
       // Refresh events
       setIsLoading(true);
       fetchEventsApi(0, 100)
@@ -118,9 +138,9 @@ export function EventsList() {
         event.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
         event.location?.toLowerCase().includes(filters.search.toLowerCase()));
 
-    // Use eventStatus for filtering, fallback to status
+    // Status filter
     const eventStatus = (event.eventStatus || event.status || '').toLowerCase();
-    const filterStatus = filters.status.toLowerCase();
+    const filterStatus = (filters.status || '').toLowerCase();
     let matchesStatus = true;
     if (filterStatus !== 'all') {
       if (filterStatus === 'ongoing') {
@@ -131,9 +151,9 @@ export function EventsList() {
       }
     }
 
-    // Use startTime for date, fallback to date
+    // Date filter
     let matchesDate = true;
-    const eventDateStr = event.startTime || event.date;
+    const eventDateStr = (event as any).startTime || (event as any).date;
     const eventDate = eventDateStr ? new Date(eventDateStr) : null;
     const now = new Date();
     if (filters.dateRange === 'upcoming' && eventDate) {
@@ -142,21 +162,55 @@ export function EventsList() {
       matchesDate = eventDate < now;
     }
 
-    // Filter own events if enabled
+    // Own events filter (match createdBy to user.id, user.email, or user.name)
     let matchesOwnership = true;
     if (filters.ownOnly && user) {
-      const creatorId = event.createdBy || event.organizer?.id || event.organizerId || event.organizer;
-      const isOrganizer = event.createdBy === user.fullName || 
-                         event.createdBy === user.name || 
-                         event.createdBy === user.id || 
-                         event.createdBy === user.email ||
-                         creatorId == user.id ||
-                         (typeof creatorId === 'object' && creatorId?.id == user.id);
-      matchesOwnership = isOrganizer;
+      const createdBy = event.createdBy;
+      // Debug log to inspect values
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.log('[MyEvents Filter]', { createdBy, user });
+      }
+      matchesOwnership = (
+        createdBy === user.email ||
+        createdBy === user.name ||
+        createdBy === user.fullName
+      );
     }
 
-    return matchesSearch && matchesStatus && matchesDate && matchesOwnership;
+    // Approval status and visibility filters
+    const matchesApproval = filters.approvalStatus === 'all' || ((event as any).approvalStatus || (event as any).approval_status) === filters.approvalStatus;
+    const matchesVisibility = filters.visibility === 'all' || ((event as any).visibility || 'PUBLIC') === filters.visibility;
+
+    return matchesSearch && matchesStatus && matchesDate && matchesOwnership && matchesApproval && matchesVisibility;
   });
+
+  // PDF Export Handler
+  const handleExportPdf = async () => {
+    try {
+      const token = localStorage.getItem('eventflow_token');
+      const response = await fetch('/api/events/download/pdf', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to download PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'events_list.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Failed to export PDF');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -168,7 +222,6 @@ export function EventsList() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* Show "Own Events" toggle for Admin and Organizer */}
           {(typeof user?.role === 'string' ? user?.role : (user?.role as any)?.name) !== 'Attendee' && (
             <Button 
               variant={filters.ownOnly ? 'primary' : 'outline'}
@@ -177,6 +230,7 @@ export function EventsList() {
               {filters.ownOnly ? 'My Events' : 'All Events'}
             </Button>
           )}
+          <Button variant="outline" onClick={() => navigate('/pending-events')}>View Pending Events</Button>
           <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleCreate}>New Event</Button>
         </div>
       </div>
@@ -189,7 +243,7 @@ export function EventsList() {
             [key as string]: value
           }));
         }}
-        onExport={() => alert('Exporting data...')}
+        onExport={handleExportPdf}
       />
 
       {error && (
@@ -204,8 +258,6 @@ export function EventsList() {
           navigate(`/event-management/${event.id}`);
         }}
       />
-
-
 
       {/* Modal for add/edit event */}
       {showModal && (
@@ -255,6 +307,16 @@ export function EventsList() {
                 placeholder="Description"
                 rows={3}
               />
+              <label className="block text-sm font-semibold text-primary mb-1 mt-2">Visibility</label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={eventForm.visibility}
+                onChange={e => setEventForm({ ...eventForm, visibility: e.target.value })}
+                required
+              >
+                <option value="PUBLIC">Public</option>
+                <option value="PRIVATE">Private</option>
+              </select>
               <div className="flex justify-end gap-2">
                 <Button type="button" onClick={() => {
                   setShowModal(false);

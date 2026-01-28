@@ -3,6 +3,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { Dashboard } from './pages/Dashboard';
 import { EventsList } from './pages/EventsList';
+import { PendingEventsList } from './pages/PendingEventsList';
 import { CalendarView } from './pages/CalendarView';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
@@ -51,6 +52,7 @@ function AppContent() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/events" element={<EventsList />} />
+                    <Route path="/pending-events" element={<PendingEventsList />} />
                     <Route path="/event-management/:eventId" element={<EventManagement />} />
                     <Route path="/calendar" element={<CalendarView />} />
                     <Route path="/analytics" element={<Analytics />} />

@@ -108,30 +108,28 @@ public class EventService {
 
         Event event = eventMapper.toEntity(eventRequestDTO);
 
-        userRepository.findById(currentUserId).ifPresent(user -> {
-            event.setOrganizer(user);
-            log.debug("[EventService] DEBUG - createEvent() - Set organizer to user " + user.getId());
-        });
-
-        event.recordCreation("system");
+        User user = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new RuntimeException("User not found for event creation: id=" + currentUserId));
+        event.setOrganizer(user);
+        // Set createdBy to the user's email for audit and filtering
+        event.recordCreation(user.getEmail());
+        log.debug("[EventService] DEBUG - createEvent() - Set organizer and createdBy to user " + user.getId() + ", email: " + user.getEmail());
         Event savedEvent = eventRepository.save(event);
 
         log.info("[EventService] INFO - Event created successfully: eventId=" + savedEvent.getId() + ", title="
                 + savedEvent.getTitle() + ", userId=" + currentUserId);
 
-        userRepository.findById(currentUserId).ifPresent(user -> {
-            try {
-                activityHistoryService.recordActivity(
-                        Objects.requireNonNull(user, "User should not be null"),
-                        com.event_management_system.entity.UserActivityHistory.ActivityType.EVENT_CREATED,
-                        "Event: " + savedEvent.getTitle(),
-                        "0.0.0.0",
-                        "system",
-                        java.util.UUID.randomUUID().toString());
-            } catch (Exception e) {
-                log.error("[EventService] ERROR - Failed to record event creation activity: " + e.getMessage());
-            }
-        });
+        try {
+            activityHistoryService.recordActivity(
+                Objects.requireNonNull(user, "User should not be null"),
+                com.event_management_system.entity.UserActivityHistory.ActivityType.EVENT_CREATED,
+                "Event: " + savedEvent.getTitle(),
+                "0.0.0.0",
+                "system",
+                java.util.UUID.randomUUID().toString());
+        } catch (Exception e) {
+            log.error("[EventService] ERROR - Failed to record event creation activity: " + e.getMessage());
+        }
 
         return eventMapper.toDto(savedEvent);
     }
@@ -448,11 +446,12 @@ public class EventService {
                         taskExecutor
                 );
 
+
         java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> csvFuture =
-                java.util.concurrent.CompletableFuture.supplyAsync(
-                        () -> loadExternalInvites(file),
-                        taskExecutor
-                );
+            java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> loadExternalInvitesDirectFromCsv(file),
+                (java.util.concurrent.Executor) taskExecutor
+            );
 
         java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> invitations =
                 usersFuture.thenCombine(csvFuture, (users, external) -> {
@@ -518,22 +517,19 @@ public class EventService {
         return users;
     }
 
-    private java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> loadExternalInvites(org.springframework.web.multipart.MultipartFile file) {
-        log.debug("[EventService] DEBUG - loadExternalInvites() started");
+    public java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> loadExternalInvitesDirectFromCsv(org.springframework.web.multipart.MultipartFile file) {
+        log.debug("[EventService] DEBUG - loadExternalInvitesDirectFromCsv() started");
 
         java.util.List<String> emails = readCsvEmails(file);
-
-        if (!emails.isEmpty()) {
-            log.info("[EventService] INFO - Read {} emails from CSV file", emails.size());
-            insertEmailsToTempTable(emails);
-            log.info("[EventService] INFO - Stored {} emails in temp_email table", emails.size());
+        if (emails.isEmpty()) {
+            log.info("[EventService] INFO - No valid emails found in CSV file");
+            return java.util.Collections.emptyList();
         }
-
-        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> externalInvites = fetchPendingEmails().stream()
+        log.info("[EventService] INFO - Read {} emails from CSV file (direct flow)", emails.size());
+        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> externalInvites = emails.stream()
                 .map(email -> new com.event_management_system.dto.InviteAttendeeRequestDTO(null, email, ""))
                 .collect(java.util.stream.Collectors.toList());
-
-        log.info("[EventService] INFO - Loaded {} external invites from temp_email table", externalInvites.size());
+        log.info("[EventService] INFO - Prepared {} external invites directly from CSV (bypassing temp_email)", externalInvites.size());
         return externalInvites;
     }
 
@@ -548,13 +544,25 @@ public class EventService {
         try (java.io.BufferedReader br = new java.io.BufferedReader(
                 new java.io.InputStreamReader(file.getInputStream()))) {
 
-            java.util.List<String> emails = br.lines()
-                    .skip(1)  
-                    .filter(line -> !line.trim().isEmpty())  
-                    .map(line -> line.split(",")[0].trim().toLowerCase())
-                    .filter(email -> email.contains("@"))
-                    .collect(java.util.stream.Collectors.toList());
+            java.util.List<String> lines = br.lines()
+                .filter(line -> !line.trim().isEmpty())
+                .collect(java.util.stream.Collectors.toList());
 
+            java.util.List<String> emails = new java.util.ArrayList<>();
+            boolean headerLooksLikeHeader = false;
+            if (!lines.isEmpty()) {
+                String first = lines.get(0).toLowerCase();
+                headerLooksLikeHeader = first.contains("email") && !first.contains("@");
+            }
+            for (int i = (headerLooksLikeHeader ? 1 : 0); i < lines.size(); i++) {
+                String[] parts = lines.get(i).split(",");
+                if (parts.length > 0) {
+                    String email = parts[0].trim().toLowerCase();
+                    if (email.contains("@")) {
+                        emails.add(email);
+                    }
+                }
+            }
             log.debug("[EventService] DEBUG - Parsed {} valid emails from CSV", emails.size());
             return emails;
 
@@ -567,42 +575,60 @@ public class EventService {
 
    
     @Async("taskExecutor")
+
     public void processBulkInvitationsAsync(
             Event event,
             java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> invitations) {
 
-        log.info("[EventService] INFO - processBulkInvitationsAsync() started for eventId={}, totalInvitations={}", 
+        log.info("[EventService] INFO - processBulkInvitationsAsync() started for eventId={}, totalInvitations={}",
                 event.getId(), invitations.size());
 
+
+
         try {
-            java.util.List<java.util.concurrent.CompletableFuture<Boolean>> tasks = invitations.stream()
-                    .map(invite -> java.util.concurrent.CompletableFuture.supplyAsync(
-                            () -> processInvitation(event, invite),
-                            taskExecutor))
-                    .collect(java.util.stream.Collectors.toList());
-
-            log.debug("[EventService] DEBUG - Created {} CompletableFuture tasks for parallel processing", tasks.size());
-
-            java.util.concurrent.CompletableFuture.allOf(tasks.toArray(new java.util.concurrent.CompletableFuture[0])).join();
-
-            log.debug("[EventService] DEBUG - All parallel tasks completed");
-
-            long successCount = tasks.stream()
-                    .map(task -> {
-                        try {
-                            return task.join() ? 1L : 0L;
-                        } catch (Exception e) {
-                            log.debug("[EventService] DEBUG - Task failed: {}", e.getMessage());
-                            return 0L;
-                        }
-                    })
-                    .reduce(0L, Long::sum);
-
-            long failureCount = tasks.size() - successCount;
-
+            long start = System.currentTimeMillis();
+            int batchSize = 10;
+            int total = invitations.size();
+            int sent = 0;
+            long successCount = 0;
+            long failureCount = 0;
+            while (sent < total) {
+                int end = Math.min(sent + batchSize, total);
+                java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> batch = invitations.subList(sent, end);
+                java.util.List<java.util.concurrent.CompletableFuture<Boolean>> tasks = new java.util.ArrayList<>();
+                for (com.event_management_system.dto.InviteAttendeeRequestDTO invite : batch) {
+                    try {
+                        tasks.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                            long emailStart = System.currentTimeMillis();
+                            boolean result = processInvitation(event, invite);
+                            long emailEnd = System.currentTimeMillis();
+                            log.info("[EventService] INFO - Email send time for {}: {} ms", invite.getEmail(), (emailEnd - emailStart));
+                            return result;
+                        }, (java.util.concurrent.Executor) taskExecutor));
+                    } catch (java.util.concurrent.RejectedExecutionException ex) {
+                        log.error("[EventService] ERROR - TaskExecutor saturated! Could not submit invitation for email: {}. Consider increasing pool size or queue capacity.", invite.getEmail());
+                    }
+                }
+                java.util.concurrent.CompletableFuture<Boolean>[] futuresArray = tasks.toArray(new java.util.concurrent.CompletableFuture[0]);
+                java.util.concurrent.CompletableFuture.allOf(futuresArray).join();
+                for (java.util.concurrent.CompletableFuture<Boolean> task : tasks) {
+                    try {
+                        if (task.join()) successCount++;
+                        else failureCount++;
+                    } catch (Exception e) {
+                        log.debug("[EventService] DEBUG - Task failed: {}", e.getMessage());
+                        failureCount++;
+                    }
+                }
+                sent = end;
+                if (sent < total) {
+                    log.info("[EventService] INFO - Throttling: sleeping 2 seconds between batches to avoid Gmail blocking");
+                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                }
+            }
             log.info("[EventService] INFO - processBulkInvitationsAsync() completed for eventId={}, successful={}, failed={}",
                     event.getId(), successCount, failureCount);
-
+            log.debug("[EventService] DEBUG - All batches completed in {} ms", (System.currentTimeMillis() - start));
         } catch (Exception e) {
             log.error("[EventService] ERROR - Exception in processBulkInvitationsAsync(): {}", e.getMessage());
             log.error("[EventService] ERROR - Stack trace: ", e);
