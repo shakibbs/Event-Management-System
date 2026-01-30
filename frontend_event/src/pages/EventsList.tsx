@@ -131,6 +131,8 @@ export function EventsList() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Restrict attendee: only show public or invited events
+  const isAttendee = (typeof user?.role === 'string' ? user?.role : (user?.role as any)?.name) === 'Attendee';
   const filteredEvents = events.filter((event) => {
     // Use title for search, fallback to name, and location
     const matchesSearch =
@@ -144,7 +146,6 @@ export function EventsList() {
     let matchesStatus = true;
     if (filterStatus !== 'all') {
       if (filterStatus === 'ongoing') {
-        // Accept both 'ongoing' and 'active' as ongoing for compatibility
         matchesStatus = eventStatus === 'ongoing' || eventStatus === 'active';
       } else {
         matchesStatus = eventStatus === filterStatus;
@@ -166,11 +167,6 @@ export function EventsList() {
     let matchesOwnership = true;
     if (filters.ownOnly && user) {
       const createdBy = event.createdBy;
-      // Debug log to inspect values
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.log('[MyEvents Filter]', { createdBy, user });
-      }
       matchesOwnership = (
         createdBy === user.email ||
         createdBy === user.name ||
@@ -182,6 +178,12 @@ export function EventsList() {
     const matchesApproval = filters.approvalStatus === 'all' || ((event as any).approvalStatus || (event as any).approval_status) === filters.approvalStatus;
     const matchesVisibility = filters.visibility === 'all' || ((event as any).visibility || 'PUBLIC') === filters.visibility;
 
+    // Attendee restriction: only public or invited events
+    if (isAttendee) {
+      const isPublic = ((event as any).visibility || 'PUBLIC') === 'PUBLIC';
+      const isInvited = Array.isArray(event.attendees) && event.attendees.some((a: any) => a.email === user?.email);
+      return matchesSearch && matchesStatus && matchesDate && matchesApproval && matchesVisibility && (isPublic || isInvited);
+    }
     return matchesSearch && matchesStatus && matchesDate && matchesOwnership && matchesApproval && matchesVisibility;
   });
 
@@ -222,16 +224,19 @@ export function EventsList() {
           </p>
         </div>
         <div className="flex gap-2">
-          {(typeof user?.role === 'string' ? user?.role : (user?.role as any)?.name) !== 'Attendee' && (
-            <Button 
-              variant={filters.ownOnly ? 'primary' : 'outline'}
-              onClick={() => setFilters(prev => ({ ...prev, ownOnly: !prev.ownOnly }))}
-            >
-              {filters.ownOnly ? 'My Events' : 'All Events'}
-            </Button>
+          {/* Hide pending events, export, and new event for attendees */}
+          {!isAttendee && (
+            <>
+              <Button 
+                variant={filters.ownOnly ? 'primary' : 'outline'}
+                onClick={() => setFilters(prev => ({ ...prev, ownOnly: !prev.ownOnly }))}
+              >
+                {filters.ownOnly ? 'My Events' : 'All Events'}
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/pending-events')}>View Pending Events</Button>
+              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleCreate}>New Event</Button>
+            </>
           )}
-          <Button variant="outline" onClick={() => navigate('/pending-events')}>View Pending Events</Button>
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleCreate}>New Event</Button>
         </div>
       </div>
 
@@ -253,10 +258,16 @@ export function EventsList() {
         data={filteredEvents}
         isLoading={isLoading}
         onDelete={handleDelete}
-        onRowClick={(event) => {
-          console.log('EventsList onRowClick:', event.id);
-          navigate(`/event-management/${event.id}`);
-        }}
+        onRowClick={(() => {
+          const roleName = typeof user?.role === 'string' ? user?.role : (user?.role && typeof user?.role === 'object' ? (user?.role as any).name : '');
+          if (roleName === 'SuperAdmin' || roleName === 'Admin') {
+            return (event) => {
+              console.log('EventsList onRowClick:', event.id);
+              navigate(`/event-management/${event.id}`);
+            };
+          }
+          return undefined;
+        })()}
       />
 
       {/* Modal for add/edit event */}

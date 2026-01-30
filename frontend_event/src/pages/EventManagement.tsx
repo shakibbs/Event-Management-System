@@ -25,6 +25,13 @@ export default function EventManagement() {
   const { user } = useAuth();
   const { eventId } = useParams();
   const navigate = useNavigate();
+  // Redirect attendees away from event management page
+  useEffect(() => {
+    const roleName = typeof user?.role === 'string' ? user?.role : (user?.role && typeof user?.role === 'object' ? (user?.role as any).name : '');
+    if (roleName === 'Attendee') {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
   const [event, setEvent] = useState<any>(null);
   const [attendees, setAttendees] = useState<any[]>([]);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -229,23 +236,25 @@ export default function EventManagement() {
   );
 
   if (error) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <div className="bg-white rounded-xl shadow-lg border border-red-200 max-w-md w-full p-8 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full px-8 py-12 text-center flex flex-col items-center">
+        <div className="mb-6 flex items-center justify-center">
+          <div className="bg-primary/10 rounded-full p-4">
+            <svg className="h-10 w-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" strokeWidth="2" stroke="currentColor" fill="none" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01" />
             </svg>
           </div>
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
-        <p className="text-slate-600 mb-6">{error}</p>
-        <button 
+        <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+        <p className="text-slate-500 mb-8">{error}</p>
+        <Button
+          variant="white"
+          className="px-8 py-3 text-base font-semibold rounded-lg shadow border border-slate-300 text-primary hover:bg-slate-50"
           onClick={() => navigate('/events')}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg transition-colors"
         >
           Back to Events
-        </button>
+        </Button>
       </div>
     </div>
   );

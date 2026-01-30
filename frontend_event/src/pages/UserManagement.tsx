@@ -191,8 +191,8 @@ export function UserManagement() {
     user.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Export button logic: show if user has 'user.manage.all' permission
-  const canExport = hasPermission(user, 'user.manage.all');
+  // Export button logic: show if user has 'user.export', 'user.manage.all', or 'user.manage.own' permission
+  const canExport = hasPermission(user, 'user.export') || hasPermission(user, 'user.manage.all') || hasPermission(user, 'user.manage.own');
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
     setExporting(true);
