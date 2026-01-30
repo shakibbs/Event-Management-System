@@ -38,6 +38,15 @@ logs/
 Thumbs.db
 .gitattributes
 
+# Ignore documentation, pdfs, images, and misc output files
+*.pdf
+!README.md
+*.md
+*.png
+*.err
+*.out.txt
+*.txt
+
 # Maven wrapper (optional)
 mvnw
 mvnw.cmd
