@@ -9,9 +9,10 @@ $jars = @(
 	"commons-logging-1.2.jar",
 	"commons-digester-2.1.jar",
 	"commons-collections-3.2.2.jar",
+	"commons-collections4-4.4.jar",
 	"commons-beanutils-1.9.4.jar",
 	"groovy-all-2.4.21.jar",
-	"itext-2.1.7.js6.jar",
+	"itext-2.1.7.jar",
 	"jfreechart-1.5.3.jar",
 	"jcommon-1.0.24.jar"
 )
@@ -23,8 +24,9 @@ $baseUrls = @{
 	"commons-digester-2.1.jar" = "https://repo1.maven.org/maven2/commons-digester/commons-digester/2.1/commons-digester-2.1.jar"
 	"commons-collections-3.2.2.jar" = "https://repo1.maven.org/maven2/commons-collections/commons-collections/3.2.2/commons-collections-3.2.2.jar"
 	"commons-beanutils-1.9.4.jar" = "https://repo1.maven.org/maven2/commons-beanutils/commons-beanutils/1.9.4/commons-beanutils-1.9.4.jar"
+	"commons-collections4-4.4.jar" = "https://repo1.maven.org/maven2/org/apache/commons/commons-collections4/4.4/commons-collections4-4.4.jar"
 	"groovy-all-2.4.21.jar" = "https://repo1.maven.org/maven2/org/codehaus/groovy/groovy-all/2.4.21/groovy-all-2.4.21.jar"
-	"itext-2.1.7.js6.jar" = "https://repo1.maven.org/maven2/com/lowagie/itext/2.1.7.js6/itext-2.1.7.js6.jar"
+	"itext-2.1.7.jar" = "https://repo1.maven.org/maven2/com/lowagie/itext/2.1.7/itext-2.1.7.jar"
 	"jfreechart-1.5.3.jar" = "https://repo1.maven.org/maven2/org/jfree/jfreechart/1.5.3/jfreechart-1.5.3.jar"
 	"jcommon-1.0.24.jar" = "https://repo1.maven.org/maven2/org/jfree/jcommon/1.0.24/jcommon-1.0.24.jar"
 }
@@ -37,28 +39,47 @@ foreach ($jar in $jars) {
 	}
 }
 
-# Build classpath string
-$cp = ($jars | ForEach-Object { "d:\event_management_system\jasper\lib\$_" }) -join ";"
+
+# Build classpath string (include compiled classes and Jakarta Persistence API)
+$jakartaJar = "d:\event_management_system\jasper\lib\jakarta.persistence-api-3.1.0.jar"
+$jarsCp = ($jars | ForEach-Object { "d:\event_management_system\jasper\lib\$_" }) -join ';'
+$cp = "d:\event_management_system\target\classes;${jakartaJar};${jarsCp}"
+
 
 
 # Compile the JRXML to JASPER and output to target/classes/
-$jrxml = "d:\event_management_system\src\main\resources\events_list.jrxml"
-$jasperOut = "d:\event_management_system\target\classes\events_list.jasper"
+$jrxml = "d:\event_management_system\src\main\resources\dynamic_export.jrxml"
+$jasperOut = "d:\event_management_system\target\classes\dynamic_export.jasper"
 
-Write-Host "Compiling events_list.jrxml to target/classes/events_list.jasper..."
+Write-Host "Compiling dynamic_export.jrxml to target/classes/dynamic_export.jasper..."
 
 # Remove old .jasper if exists
 if (Test-Path $jasperOut) {
-	Remove-Item $jasperOut -Force
+	try {
+		Remove-Item $jasperOut -Force
+	} catch {
+		Write-Host "Warning: Could not remove $jasperOut. It may be locked by another process. Please close any application using it and try again." -ForegroundColor Yellow
+	}
 }
 
-# Compile using JasperCompileManager (with output)
-$compileCmd = "-cp `"$cp`" net.sf.jasperreports.engine.JasperCompileManager $jrxml $jasperOut"
-Write-Host "Running: java $compileCmd"
-$proc = Start-Process java -ArgumentList $compileCmd -NoNewWindow -Wait -PassThru -RedirectStandardOutput jasper_compile.log -RedirectStandardError jasper_compile.err
+
+
+# Compile using JasperCompiler Java class (include all JARs and classes)
+Write-Host "Compiling JasperCompiler.java..."
+$javacCp = '"' + $cp + ';d:\event_management_system\jasper"'
+& javac -cp $javacCp "d:\event_management_system\jasper\JasperCompiler.java"
+
+
+
+
+
+$runCp = '"' + $cp + ';d:\event_management_system\jasper"'
+Write-Host "Running: java -cp $runCp JasperCompiler $jrxml $jasperOut"
+& java -cp $runCp JasperCompiler $jrxml $jasperOut 1> jasper_compile.log 2> jasper_compile.err
+$procExitCode = $LASTEXITCODE
 
 # Check for errors
-if ($proc.ExitCode -ne 0) {
+if ($procExitCode -ne 0) {
 	Write-Host "Jasper compilation failed. See jasper_compile.err for details." -ForegroundColor Red
 	Get-Content jasper_compile.err
 	exit 1

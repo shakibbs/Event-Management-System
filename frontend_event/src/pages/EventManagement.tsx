@@ -1,6 +1,20 @@
 
 
 import { useEffect, useState, useRef } from 'react';
+
+// Simple Toast Notification System
+function Toast({ message, onClose, type = 'info' }: { message: string, onClose: () => void, type?: 'info' | 'success' | 'error' }) {
+  return (
+    <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded shadow-lg text-white font-medium transition-all animate-fade-in-up ${
+      type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800'
+    }`}>
+      <div className="flex items-center gap-3">
+        <span>{message}</span>
+        <button onClick={onClose} className="ml-4 text-white/80 hover:text-white text-lg">&times;</button>
+      </div>
+    </div>
+  );
+}
 import { useAuth } from '../hooks/useAuth';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
@@ -18,6 +32,9 @@ export default function EventManagement() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteResult, setInviteResult] = useState<{message?: string; total?: number} | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  // Toast state
+  const [toast, setToast] = useState<{ message: string, type?: 'info' | 'success' | 'error' } | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
@@ -168,6 +185,13 @@ export default function EventManagement() {
 
   const handleInvite = () => {
     setShowInviteModal(true);
+  }
+
+  // Toast helpers
+  const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3500) => {
+    setToast({ message, type });
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToast(null), duration);
   };
 
   // (Removed duplicate handleInviteSubmit)
@@ -175,16 +199,19 @@ export default function EventManagement() {
   const handleInviteSubmit = async () => {
     setInviteLoading(true);
     setInviteResult(null);
+    // Immediately close the modal and show background toast
+    setShowInviteModal(false);
+    showToast('Invitations are being sent in the background.', 'info');
     try {
       const result = await inviteUserApi(eventId, inviteFile || undefined);
       setInviteResult({
         message: result?.message || 'Bulk invitations submitted for processing',
         total: result?.total
       });
-      // Optionally, you can close the modal after a delay, or let user close it manually
-      // setTimeout(() => setShowInviteModal(false), 3000);
+      showToast(result?.message || 'Bulk invitations submitted for processing', 'success');
     } catch (err: any) {
       setInviteResult({ message: 'Failed to send invitations: ' + (err?.message || 'Unknown error') });
+      showToast('Failed to send invitations: ' + (err?.message || 'Unknown error'), 'error');
     } finally {
       setInviteLoading(false);
     }
@@ -300,6 +327,8 @@ export default function EventManagement() {
 
   return (
     <div className="min-h-screen bg-surface p-4 md:p-8">
+      {/* Toast Notification */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="flex items-center justify-between mb-8">
@@ -523,14 +552,7 @@ export default function EventManagement() {
                   </div>
                 )}
               </div>
-              {inviteResult && (
-                <div className={`mt-4 p-3 rounded-lg text-sm ${inviteResult.message?.startsWith('Failed') ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                  <div>{inviteResult.message}</div>
-                  {typeof inviteResult.total === 'number' && (
-                    <div>Total invitations: <b>{inviteResult.total}</b></div>
-                  )}
-                </div>
-              )}
+              {/* No inviteResult here, as toast will show result */}
             </div>
             <div className="border-t border-slate-200 px-6 py-4 flex gap-3 justify-end">
               <Button onClick={() => { setShowInviteModal(false); setInviteResult(null); }} variant="secondary">Cancel</Button>

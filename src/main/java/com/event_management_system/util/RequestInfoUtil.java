@@ -12,50 +12,20 @@ import org.springframework.stereotype.Component;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * RequestInfoUtil
- * 
- * Utility class to extract information from HTTP requests
- * 
- * Features:
- * - Extract real client IP (handles proxies and load balancers)
- * - Parse User-Agent to get device/browser info
- * - Generate unique device ID
- * 
- * Purpose:
- * - Detect suspicious logins from new locations/devices
- * - Track device changes
- * - Security auditing
- */
+
 @Component
 public class RequestInfoUtil {
     
-    /**
-     * Get the real client IP address from request
-     * 
-     * Handles:
-     * - Direct connections: 192.168.1.1
-     * - Behind proxy: X-Forwarded-For header
-     * - Behind load balancer: X-Real-IP header
-     * 
-     * Usage:
-     * String clientIp = requestInfoUtil.getClientIpAddress(request);
-     * → Returns: "192.168.1.1" or "115.42.33.55"
-     * 
-     * @param request - HTTP request
-     * @return Client IP address as string
-     */
+  
     public String getClientIpAddress(HttpServletRequest request) {
         if (request == null) {
             return "0.0.0.0";
         }
         
         try {
-            // Check X-Forwarded-For header (multiple proxies)
             String xForwardedFor = request.getHeader("X-Forwarded-For");
             if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-                // X-Forwarded-For can have multiple IPs: "192.168.1.1, 10.0.0.1, 203.54.89.20"
-                // First one is the client IP
+               
                 String[] ips = xForwardedFor.split(",");
                 String clientIp = ips[0].trim();
                 if (isValidIp(clientIp)) {
@@ -63,19 +33,16 @@ public class RequestInfoUtil {
                 }
             }
             
-            // Check X-Real-IP header (single proxy/load balancer)
             String xRealIp = request.getHeader("X-Real-IP");
             if (xRealIp != null && !xRealIp.isEmpty() && isValidIp(xRealIp)) {
                 return xRealIp;
             }
             
-            // Check Cf-Connecting-IP (Cloudflare)
             String cfConnectingIp = request.getHeader("Cf-Connecting-IP");
             if (cfConnectingIp != null && !cfConnectingIp.isEmpty() && isValidIp(cfConnectingIp)) {
                 return cfConnectingIp;
             }
             
-            // Check if behind AWS ELB
             String realIp = request.getHeader("X-Aws-Cf-Source-Ip");
             if (realIp != null && !realIp.isEmpty() && isValidIp(realIp)) {
                 return realIp;
@@ -94,21 +61,13 @@ public class RequestInfoUtil {
         }
     }
     
-    /**
-     * Validate IP address format
-     * 
-     * @param ip - IP address to validate
-     * @return true if valid IPv4/IPv6 format
-     */
+   
     private boolean isValidIp(String ip) {
         if (ip == null || ip.isEmpty() || ip.equals("unknown")) {
             return false;
         }
         
-        // Simple validation - check if it looks like an IP
-        // IPv4: xxx.xxx.xxx.xxx
         String ipv4Pattern = "^(\\d{1,3}\\.){3}\\d{1,3}$";
-        // IPv6: starts with :
         String ipv6Pattern = "^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$";
         
         Pattern p4 = Pattern.compile(ipv4Pattern);
@@ -117,24 +76,7 @@ public class RequestInfoUtil {
         return p4.matcher(ip).matches() || p6.matcher(ip).matches();
     }
     
-    /**
-     * Parse User-Agent header to extract device/browser information
-     * 
-     * Usage:
-     * Map<String, String> info = requestInfoUtil.parseUserAgent(request);
-     * → Returns:
-     *   {
-     *     "browser": "Chrome",
-     *     "browserVersion": "120.0",
-     *     "os": "Windows",
-     *     "osVersion": "10",
-     *     "deviceType": "Desktop",
-     *     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
-     *   }
-     * 
-     * @param request - HTTP request
-     * @return Map with browser, OS, and device type info
-     */
+   
     public Map<String, String> parseUserAgent(HttpServletRequest request) {
         Map<String, String> deviceInfo = new HashMap<>();
         
@@ -150,7 +92,6 @@ public class RequestInfoUtil {
             
             deviceInfo.put("userAgent", userAgent);
             
-            // Parse Browser
             if (userAgent.contains("Chrome")) {
                 deviceInfo.put("browser", "Chrome");
                 deviceInfo.put("browserVersion", extractVersion(userAgent, "Chrome/([\\d.]+)"));
@@ -171,7 +112,6 @@ public class RequestInfoUtil {
                 deviceInfo.put("browserVersion", "Unknown");
             }
             
-            // Parse Operating System
             if (userAgent.contains("Windows NT 10.0")) {
                 deviceInfo.put("os", "Windows");
                 deviceInfo.put("osVersion", "10");
@@ -201,7 +141,6 @@ public class RequestInfoUtil {
                 deviceInfo.put("osVersion", "Unknown");
             }
             
-            // Parse Device Type
             if (userAgent.contains("Mobile") || userAgent.contains("Android") || userAgent.contains("iPhone")) {
                 deviceInfo.put("deviceType", "Mobile");
             } else if (userAgent.contains("Tablet") || userAgent.contains("iPad")) {
@@ -217,13 +156,7 @@ public class RequestInfoUtil {
         }
     }
     
-    /**
-     * Extract version number from User-Agent string using regex
-     * 
-     * @param userAgent - Full User-Agent string
-     * @param pattern - Regex pattern to extract version
-     * @return Version string or "Unknown"
-     */
+    
     private String extractVersion(String userAgent, String pattern) {
         try {
             Pattern p = Pattern.compile(pattern);
@@ -237,11 +170,7 @@ public class RequestInfoUtil {
         return "Unknown";
     }
     
-    /**
-     * Get default device info
-     * 
-     * @return Map with default values
-     */
+    
     private Map<String, String> getDefaultDeviceInfo() {
         Map<String, String> defaultInfo = new HashMap<>();
         defaultInfo.put("browser", "Unknown");
@@ -253,21 +182,7 @@ public class RequestInfoUtil {
         return defaultInfo;
     }
     
-    /**
-     * Generate unique device ID from IP address and User-Agent
-     * 
-     * Device ID is a hash of IP + User-Agent
-     * Same device will always generate same ID
-     * Different device will generate different ID
-     * 
-     * Usage:
-     * String deviceId = requestInfoUtil.generateDeviceId(ipAddress, userAgent);
-     * → Returns: "device_abc123def456"
-     * 
-     * @param ipAddress - Client IP address
-     * @param userAgent - User-Agent string
-     * @return Unique device ID
-     */
+   
     public String generateDeviceId(String ipAddress, String userAgent) {
         try {
             if (ipAddress == null || ipAddress.isEmpty()) {
@@ -277,14 +192,11 @@ public class RequestInfoUtil {
                 userAgent = "Unknown";
             }
             
-            // Combine IP + User-Agent
             String combinedString = ipAddress + "|" + userAgent;
             
-            // Hash it using SHA-256
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(combinedString.getBytes(StandardCharsets.UTF_8));
             
-            // Convert to hex string
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -294,7 +206,6 @@ public class RequestInfoUtil {
                 hexString.append(hex);
             }
             
-            // Return first 16 characters of hash (enough for uniqueness)
             return "device_" + hexString.toString().substring(0, 16);
         } catch (NoSuchAlgorithmException e) {
             System.err.println("Error generating device ID: " + e.getMessage());
@@ -302,12 +213,7 @@ public class RequestInfoUtil {
         }
     }
     
-    /**
-     * Overload: Generate device ID from request directly
-     * 
-     * @param request - HTTP request
-     * @return Unique device ID
-     */
+    
     public String generateDeviceId(HttpServletRequest request) {
         if (request == null) {
             return "device_unknown";
@@ -319,28 +225,12 @@ public class RequestInfoUtil {
         return generateDeviceId(ipAddress, userAgent);
     }
     
-    /**
-     * Overload: Generate device ID from IP only (simple version)
-     * 
-     * @param ipAddress - Client IP address
-     * @return Device ID based on IP hash
-     */
+    
     public String generateDeviceId(String ipAddress) {
         return generateDeviceId(ipAddress, "default");
     }
     
-    /**
-     * Get complete device information from request
-     * 
-     * Combines IP, browser, OS, and device type
-     * 
-     * Usage:
-     * String deviceInfo = requestInfoUtil.getCompleteDeviceInfo(request);
-     * → Returns: "Chrome 120 on Windows 10 (Desktop) from 192.168.1.1"
-     * 
-     * @param request - HTTP request
-     * @return Human-readable device info string
-     */
+   
     public String getCompleteDeviceInfo(HttpServletRequest request) {
         try {
             String ipAddress = getClientIpAddress(request);

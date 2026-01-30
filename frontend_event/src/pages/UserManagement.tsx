@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../lib/api';
 import { Button } from '../components/ui/Button';
+import { Download } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { useAuth } from '../hooks/useAuth';
@@ -190,36 +191,80 @@ export function UserManagement() {
     user.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Export button logic: show if user has 'user.manage.all' permission
+  const canExport = hasPermission(user, 'user.manage.all');
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem('eventflow_token');
+      const response = await fetch('http://localhost:8083/api/users/download/pdf', {
+        method: 'GET',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to download PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'users_list.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e.message || 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="w-full px-0">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4">
         <h2 className="text-2xl font-bold">User Management</h2>
-        {(canManageAll || canManageOwn) && (
-          <Button
-            onClick={async () => {
-              // If roles are not loaded, fetch them first
-              let roles = allRoles;
-              if (roles.length === 0) {
-                roles = await apiRequest('/roles');
-                setAllRoles(roles);
-              }
-              // Pre-select Attendee role for user.manage.own (not user.manage.all)
-              let defaultRole = '';
-              if (canManageOwn && !canManageAll) {
-                const attendeeRole = roles.find((role: any) => role.name === 'Attendee');
-                if (attendeeRole) defaultRole = attendeeRole.id;
-              }
-              setUserForm({ fullName: '', email: '', password: '', role: defaultRole });
-              setSelectedUser(null);
-              setShowModal(true);
-              setEditMode(false);
-            }}
-            className="bg-primary text-white"
-            disabled={canManageOwn && !canManageAll && (roleLoading || allRoles.filter((role: any) => role.name === 'Attendee').length === 0)}
-          >
-            Add User
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canExport && (
+            <Button
+              onClick={handleExport}
+              variant="secondary"
+              className="font-bold shadow-md px-6 border border-slate-300 bg-white text-primary hover:bg-slate-50"
+              leftIcon={<Download className="w-5 h-5" />}
+              disabled={exporting}
+              isLoading={exporting}
+            >
+              Export
+            </Button>
+          )}
+          {(canManageAll || canManageOwn) && (
+            <Button
+              onClick={async () => {
+                // If roles are not loaded, fetch them first
+                let roles = allRoles;
+                if (roles.length === 0) {
+                  roles = await apiRequest('/roles');
+                  setAllRoles(roles);
+                }
+                // Pre-select Attendee role for user.manage.own (not user.manage.all)
+                let defaultRole = '';
+                if (canManageOwn && !canManageAll) {
+                  const attendeeRole = roles.find((role: any) => role.name === 'Attendee');
+                  if (attendeeRole) defaultRole = attendeeRole.id;
+                }
+                setUserForm({ fullName: '', email: '', password: '', role: defaultRole });
+                setSelectedUser(null);
+                setShowModal(true);
+                setEditMode(false);
+              }}
+              className="bg-primary text-white"
+              disabled={canManageOwn && !canManageAll && (roleLoading || allRoles.filter((role: any) => role.name === 'Attendee').length === 0)}
+            >
+              Add User
+            </Button>
+          )}
+        </div>
       </div>
       {error && <div className="mb-4 text-red-600">{error}</div>}
       <div className="mb-4">

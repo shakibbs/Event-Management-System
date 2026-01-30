@@ -1,10 +1,10 @@
 
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
-import { LogIn, LogOut, Calendar, PlusCircle, Edit3, Trash2, Lock, User, Award, Shield, CheckCircle, XCircle } from 'lucide-react';
+import { LogIn, LogOut, Calendar, PlusCircle, Edit3, Trash2, Lock, User, Award, Shield, CheckCircle, XCircle, Download } from 'lucide-react';
 
 const ACTIVITY_TYPES = [
   'USER_LOGIN', 'USER_LOGOUT', 'EVENT_CREATED', 'EVENT_UPDATED', 'EVENT_DELETED',
@@ -48,7 +48,37 @@ function UserAvatar({ name }: { name: string }) {
 
 
 export function ActivityList() {
-  const { user } = useAuth();
+    // Export activity history as PDF
+    const handleExport = async () => {
+      try {
+        const token = localStorage.getItem('eventflow_token');
+        // Build export URL based on current filters
+        let url = 'http://localhost:8083/api/history/download/pdf?type=activity';
+        if (selectedUserId) url += `&userId=${encodeURIComponent(selectedUserId)}`;
+        if (activityType) url += `&activityType=${encodeURIComponent(activityType)}`;
+        if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+        if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+          },
+        });
+        if (!response.ok) throw new Error('Failed to download PDF');
+        const blob = await response.blob();
+        const urlObj = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlObj;
+        a.download = 'activity_history.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(urlObj);
+      } catch (e: any) {
+        alert(e.message || 'Export failed');
+      }
+    };
+  const { user, isLoading } = useAuth();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +88,10 @@ export function ActivityList() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // Fetch all users for SuperAdmin
+  // Fetch all users for users with permission
   useEffect(() => {
-    if (user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin'))) {
+    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    if (hasAllHistoryPermission) {
       apiRequest('/users?size=1000')
         .then((data) => {
           setUsers(Array.isArray(data) ? data : (data.content || []));
@@ -71,17 +102,20 @@ export function ActivityList() {
 
   // Build API URL based on filters and role
   function buildApiUrl() {
-    // SuperAdmin: can filter by user, type, date
-    if (user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin'))) {
+    // Users with permission: can filter by user, type, date
+    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    if (hasAllHistoryPermission) {
+      // Treat both null and empty string as 'All users'
+      const isAllUsers = selectedUserId === null || selectedUserId === '';
       if (activityType) {
-        return `/history/activity/type/${activityType}` + (selectedUserId ? `?userId=${selectedUserId}` : '');
+        return `/history/activity/type/${activityType}` + (!isAllUsers ? `?userId=${selectedUserId}` : '');
       }
       if (startDate && endDate) {
         let url = `/history/activity/range?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
-        if (selectedUserId) url += `&userId=${selectedUserId}`;
+        if (!isAllUsers) url += `&userId=${selectedUserId}`;
         return url;
       }
-      if (selectedUserId) {
+      if (!isAllUsers) {
         return `/history/activity?userId=${selectedUserId}`;
       }
       return '/history/activity?all=true';
@@ -98,15 +132,27 @@ export function ActivityList() {
 
   // Fetch activities when filters change
   useEffect(() => {
+    if (isLoading || !user) return; // Wait until auth is loaded and user is present
     setLoading(true);
     setError(null);
-    const url = buildApiUrl();
-    apiRequest(url)
-      .then(setActivities)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+
+    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    const isAllUsers = hasAllHistoryPermission && (selectedUserId === null || selectedUserId === '');
+
+    if (isAllUsers) {
+      apiRequest('/history/all?all=true')
+        .then((data) => setActivities(data.activities || []))
+        .catch(e => setError(e.message))
+        .finally(() => setLoading(false));
+    } else {
+      const url = buildApiUrl();
+      apiRequest(url)
+        .then(setActivities)
+        .catch(e => setError(e.message))
+        .finally(() => setLoading(false));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUserId, activityType, startDate, endDate, user]);
+  }, [selectedUserId, activityType, startDate, endDate, user, isLoading]);
 
   // Reset filters when user changes
   useEffect(() => {
@@ -123,9 +169,19 @@ export function ActivityList() {
     <div className="min-h-screen bg-surface p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-primary mb-2">User Activity History</h1>
-          <p className="text-text-secondary">Track and monitor all user activities and system events</p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-primary mb-2">User Activity History</h1>
+            <p className="text-text-secondary">Track and monitor all user activities and system events</p>
+          </div>
+          <Button
+            onClick={handleExport}
+            variant="secondary"
+            className="font-bold shadow-md px-6 border border-slate-300 bg-white text-primary hover:bg-slate-50"
+            leftIcon={<Download className="w-5 h-5" />}
+          >
+            Export
+          </Button>
         </div>
 
         {/* Filter Bar */}
@@ -138,8 +194,8 @@ export function ActivityList() {
                 <select
                   id="userFilter"
                   className="border border-surface-tertiary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                  value={selectedUserId || ''}
-                  onChange={e => setSelectedUserId(e.target.value || null)}
+                  value={selectedUserId === null ? '' : selectedUserId}
+                  onChange={e => setSelectedUserId(e.target.value === '' ? null : e.target.value)}
                 >
                   <option value="">All users</option>
                   {users.map((u: any) => (

@@ -154,15 +154,14 @@ public class UserActivityHistoryService {
     
     
     @Transactional(readOnly = true)
-    public List<UserActivityHistoryResponseDTO> getAllActivities() {
-        List<UserActivityHistory> activities = activityHistoryRepository
-                .findByActivityDateBetweenOrderByActivityDateDesc(
-                    LocalDateTime.of(2000, 1, 1, 0, 0),
-                    LocalDateTime.now()
-                );
-        
-        return activities.stream()
-                .map(activityHistoryMapper::toDto)
-                .collect(Collectors.toList());
-    }
+        public List<UserActivityHistoryResponseDTO> getAllActivities() {
+                List<UserActivityHistory> activities = activityHistoryRepository
+                                .findAllWithCreatedByAndUpdatedBy(
+                                        LocalDateTime.of(2000, 1, 1, 0, 0),
+                                        LocalDateTime.now()
+                                );
+                return activities.stream()
+                                .map(activityHistoryMapper::toDto)
+                                .collect(Collectors.toList());
+        }
 }

@@ -35,9 +35,12 @@ public class UserController {
 
     @Autowired
     private UserService userService;
-    
+
     @Autowired
     private ApplicationLoggerService log;
+
+    @Autowired
+    private com.event_management_system.service.ReportService reportService;
 
     @PostMapping
     @Operation(summary = "Create a new user", description = "Creates a new user with provided details")
@@ -181,6 +184,57 @@ public class UserController {
         } catch (Exception e) {
             log.error("[UserController] ERROR - removeRoleFromUser() - Failed to remove role from user: userId=" + userId + ", roleId=" + roleId, e);
             throw e;
+        }
+    }
+    
+    @GetMapping(value = "/download/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+    @Operation(summary = "Download users as PDF", description = "Downloads a PDF of all users visible to the current user, filtered by role/permission.")
+    public ResponseEntity<byte[]> downloadUsersPdf(Authentication authentication) {
+    log.info("PDF user export endpoint called. Authentication: {}", authentication != null ? authentication.toString() : "null");
+        if (authentication == null) {
+            log.warn("No authentication provided to /api/users/download/pdf");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        } else {
+            log.info("Authenticated principal: {} (authorities: {})", authentication.getName(), authentication.getAuthorities().toString());
+        }
+
+        String email = authentication.getName();
+        User currentUser = userService.getUserEntityByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        boolean canExportAll = userService.hasPermission(currentUser.getId(), "user.manage.all");
+        boolean canExportOwn = userService.hasPermission(currentUser.getId(), "user.manage.own");
+        boolean canExport = userService.hasPermission(currentUser.getId(), "user.export") || canExportAll || canExportOwn;
+        if (!canExport) {
+            log.warn("User {} does not have permission to export user list", currentUser.getId());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        java.util.List<UserResponseDTO> allUsers = userService.getAllUsers();
+        java.util.List<UserResponseDTO> filteredUsers;
+        if (canExportAll) {
+            filteredUsers = allUsers;
+        } else if (canExportOwn) {
+            filteredUsers = allUsers.stream()
+                .filter(u -> u.getRole() != null && u.getRole().getName() != null && u.getRole().getName().equalsIgnoreCase("Attendee"))
+                .collect(java.util.stream.Collectors.toList());
+        } else {
+            filteredUsers = java.util.Collections.emptyList();
+        }
+
+        java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+        parameters.put("generatedBy", currentUser.getFullName());
+        parameters.put("generatedAt", java.time.LocalDateTime.now().toString());
+
+        try {
+            // Use the new generateUsersPdf for users
+            byte[] pdfBytes = reportService.generateUsersPdf(filteredUsers, parameters);
+            return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=users_list.pdf")
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+        } catch (net.sf.jasperreports.engine.JRException | IllegalArgumentException e) { // multicatch is correct for these exceptions
+            log.error("Failed to generate PDF report", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

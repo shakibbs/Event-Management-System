@@ -440,39 +440,64 @@ public class EventService {
 
         Event event = validateEvent(eventId, organizerId);
 
-        java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> usersFuture =
-                java.util.concurrent.CompletableFuture.supplyAsync(
-                        () -> loadRegisteredUsers(organizerId),
-                        taskExecutor
-                );
-
-
+        // Load CSV invitations (external emails)
         java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> csvFuture =
             java.util.concurrent.CompletableFuture.supplyAsync(
                 () -> loadExternalInvitesDirectFromCsv(file),
                 (java.util.concurrent.Executor) taskExecutor
             );
 
-        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> invitations =
-                usersFuture.thenCombine(csvFuture, (users, external) -> {
-                    java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> combined = new java.util.ArrayList<>(users);
-                    combined.addAll(external);
-                    return combined;
-                }).join();
+        // Load temp_email invitations (pending emails from temp table)
+        java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> tempFuture =
+            java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> {
+                    java.util.List<String> tempEmails = fetchPendingEmails();
+                    return tempEmails.stream()
+                        .map(email -> new com.event_management_system.dto.InviteAttendeeRequestDTO(null, email, ""))
+                        .collect(java.util.stream.Collectors.toList());
+                },
+                (java.util.concurrent.Executor) taskExecutor
+            );
 
-        if (invitations.isEmpty()) {
-            log.warn("[EventService] WARN - No users to invite for eventId={}", eventId);
-            throw new BadRequestException("No users to invite");
+        // Load registered users (excluding organizer)
+        java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> registeredFuture =
+            java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> loadRegisteredUsers(organizerId),
+                (java.util.concurrent.Executor) taskExecutor
+            );
+
+        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> csvInvites = csvFuture.join();
+        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> tempInvites = tempFuture.join();
+        java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO> registeredInvites = registeredFuture.join();
+
+        int totalCsv = csvInvites.size();
+        int totalTemp = tempInvites.size();
+        int totalRegistered = registeredInvites.size();
+
+        if (totalCsv == 0 && totalTemp == 0 && totalRegistered == 0) {
+            log.warn("[EventService] WARN - No emails to invite for eventId={}", eventId);
+            throw new BadRequestException("No emails to invite");
         }
 
-        log.info("[EventService] INFO - Starting bulk invitations for eventId={}, totalInvitations={}", eventId, invitations.size());
-
-        processBulkInvitationsAsync(event, invitations);
+        if (totalCsv > 0) {
+            log.info("[EventService] INFO - Starting CSV invitations for eventId={}, totalCsv={}", eventId, totalCsv);
+            processBulkInvitationsAsync(event, csvInvites);
+        }
+        if (totalTemp > 0) {
+            log.info("[EventService] INFO - Starting temp_email invitations for eventId={}, totalTemp={}", eventId, totalTemp);
+            processBulkInvitationsAsync(event, tempInvites);
+        }
+        if (totalRegistered > 0) {
+            log.info("[EventService] INFO - Starting registered user invitations for eventId={}, totalRegistered={}", eventId, totalRegistered);
+            processBulkInvitationsAsync(event, registeredInvites);
+        }
 
         return java.util.Map.of(
                 "status", "processing",
-                "message", "Bulk invitations submitted for processing",
-                "total", invitations.size(),
+                "message", "CSV, temp_email, and registered user invitations submitted for processing",
+                "csvTotal", totalCsv,
+                "tempTotal", totalTemp,
+                "registeredTotal", totalRegistered,
                 "eventId", eventId
         );
     }

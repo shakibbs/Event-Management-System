@@ -26,6 +26,7 @@ export interface User {
   email: string;
   role?: Role | string;
   avatar?: string;
+  permissions?: string[]; // Added for dynamic permission checks
 }
 
 export interface MetricData {

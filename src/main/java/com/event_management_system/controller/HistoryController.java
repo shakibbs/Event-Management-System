@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.event_management_system.dto.AllHistoryResponseDTO;
 import com.event_management_system.dto.UserActivityHistoryResponseDTO;
 import com.event_management_system.dto.UserLoginLogoutHistoryResponseDTO;
 import com.event_management_system.dto.UserPasswordHistoryResponseDTO;
@@ -32,6 +33,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping("/api/history")
 @Tag(name = "History", description = "APIs for retrieving user history and activities")
 public class HistoryController {
+        @Autowired
+        private com.event_management_system.service.ReportService reportService;
     
     @Autowired
     private UserLoginLogoutHistoryService loginHistoryService;
@@ -335,4 +338,148 @@ public class HistoryController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+
+        @GetMapping("/all")
+    @Operation(
+        summary = "Get all history types (activity, login/logout, password change)",
+        description = "Fetches all history types for the authenticated user, a specific user (SuperAdmin only), or all users (SuperAdmin only)"
+    )
+    public ResponseEntity<AllHistoryResponseDTO> getAllHistory(
+            @Parameter(description = "Target user ID (SuperAdmin only)")
+            @RequestParam(required = false) Long userId,
+            @Parameter(description = "All users (SuperAdmin only)")
+            @RequestParam(required = false, defaultValue = "false") boolean all) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            boolean isSuperAdmin = userService.hasPermission(currentUserId, "history.view.all");
+            Long targetUserId = (userId != null) ? userId : currentUserId;
+            if (!isSuperAdmin && (all || !currentUserId.equals(targetUserId))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            List<UserActivityHistoryResponseDTO> activities = isSuperAdmin && all
+                ? activityHistoryService.getAllActivityHistory()
+                : activityHistoryService.getActivityHistory(targetUserId);
+
+            List<UserLoginLogoutHistoryResponseDTO> logins = isSuperAdmin && all
+                ? loginHistoryService.getAllLoginHistory()
+                : loginHistoryService.getLoginHistory(targetUserId);
+
+            List<UserPasswordHistoryResponseDTO> passwords = isSuperAdmin && all
+                ? passwordHistoryService.getAllPasswordHistory()
+                : passwordHistoryService.getPasswordHistory(targetUserId);
+
+            AllHistoryResponseDTO response = new AllHistoryResponseDTO(activities, logins, passwords);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            log.error("[HistoryController] ERROR - getAllHistory() - {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            log.error("[HistoryController] ERROR - getAllHistory() - {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    
+        @GetMapping(value = "/download/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+        @Operation(summary = "Download history as PDF", description = "Downloads a PDF of user activity, login/logout, or password history, filtered by type and role/permission.")
+        public ResponseEntity<byte[]> downloadHistoryPdf(
+                Authentication authentication,
+                @RequestParam(name = "type", defaultValue = "activity") String type) {
+            log.info("PDF history export endpoint called. Authentication: {}, type: {}", authentication, type);
+            if (authentication == null) {
+                log.warn("No authentication provided to /api/history/download/pdf");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            String email = authentication.getName();
+            Long currentUserId = userService.getUserIdByEmail(email);
+
+            // Permission logic: .view.all, .view.own, .export for each type
+            String permAll, permOwn, permExport;
+            java.util.List<?> allData;
+            java.util.List<?> filteredData;
+            String filename;
+            switch (type.toLowerCase()) {
+                case "login":
+                case "loginlogout":
+                case "login-logout":
+                    permAll = "loginhistory.view.all";
+                    permOwn = "loginhistory.view.own";
+                    permExport = "loginhistory.export";
+                    allData = loginHistoryService.getAllLoginHistory();
+                    filename = "login_logout_history.pdf";
+                    break;
+                case "password":
+                case "passwordhistory":
+                    permAll = "passwordhistory.view.all";
+                    permOwn = "passwordhistory.view.own";
+                    permExport = "passwordhistory.export";
+                    allData = passwordHistoryService.getAllPasswordHistory();
+                    filename = "password_history.pdf";
+                    break;
+                case "activity":
+                default:
+                    permAll = "history.view.all";
+                    permOwn = "history.view.own";
+                    permExport = "history.export";
+                    allData = activityHistoryService.getAllActivityHistory();
+                    filename = "activity_history.pdf";
+                    break;
+            }
+
+            boolean canExportAll = userService.hasPermission(currentUserId, permAll);
+            boolean canExportOwn = userService.hasPermission(currentUserId, permOwn);
+            boolean canExport = userService.hasPermission(currentUserId, permExport) || canExportAll || canExportOwn;
+            if (!canExport) {
+                log.warn("User {} does not have permission to export {} history", currentUserId, type);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            if (canExportAll) {
+                filteredData = allData;
+            } else if (canExportOwn) {
+                @SuppressWarnings("unchecked")
+                java.util.List<Object> allDataObj = (java.util.List<Object>) allData;
+                filteredData = allDataObj.stream()
+                    .filter(obj -> {
+                        try {
+                            java.lang.reflect.Method getUserId = obj.getClass().getMethod("getUserId");
+                            Object uid = getUserId.invoke(obj);
+                            return uid != null && uid.equals(currentUserId);
+                        } catch (ReflectiveOperationException e) {
+                            return false;
+                        }
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+            } else {
+                filteredData = java.util.Collections.emptyList();
+            }
+
+            java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+            parameters.put("generatedBy", email);
+            parameters.put("generatedAt", java.time.LocalDateTime.now().toString());
+
+            try {
+                byte[] pdfBytes;
+                if ("activity".equalsIgnoreCase(type)) {
+                    pdfBytes = reportService.generateActivityPdf(filteredData, parameters);
+                } else if ("login".equalsIgnoreCase(type) || "loginlogout".equalsIgnoreCase(type) || "login-logout".equalsIgnoreCase(type)) {
+                    pdfBytes = reportService.generateEventsPdf(filteredData, parameters); // fallback for login/logout, or implement a specific method if needed
+                } else if ("password".equalsIgnoreCase(type) || "passwordhistory".equalsIgnoreCase(type)) {
+                    pdfBytes = reportService.generateEventsPdf(filteredData, parameters); // fallback for password, or implement a specific method if needed
+                } else {
+                    pdfBytes = reportService.generateActivityPdf(filteredData, parameters);
+                }
+                return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + filename)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+            } catch (net.sf.jasperreports.engine.JRException | IllegalArgumentException e) {
+                log.error("Failed to generate PDF report", e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
+        }
+    
 }

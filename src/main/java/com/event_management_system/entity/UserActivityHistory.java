@@ -109,7 +109,7 @@ public class UserActivityHistory {
     @Column(name = "username", length = 255)
     private String username;
     
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "created_by")
     private User createdBy;
     
@@ -119,7 +119,7 @@ public class UserActivityHistory {
     @Column(name = "created_date", nullable = false, updatable = false)
     private LocalDateTime createdDate;
     
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "updated_by")
     private User updatedBy;
     

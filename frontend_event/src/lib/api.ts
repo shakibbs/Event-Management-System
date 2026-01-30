@@ -144,10 +144,18 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
     '/events/public',
     '/events/respond'
   ];
-  let headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {})
-  };
+  // Ensure headers is always a plain object, not a FileList, array, or Headers instance
+  let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      // Convert Headers instance to plain object
+      options.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (typeof options.headers === 'object' && !Array.isArray(options.headers)) {
+      headers = { ...headers, ...options.headers };
+    }
+  }
   const isPublic = publicEndpoints.some(e => path.startsWith(e));
   if (!isPublic) {
     const token = localStorage.getItem('eventflow_token');

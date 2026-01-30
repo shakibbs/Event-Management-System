@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.event_management_system.entity.UserActivityHistory;
@@ -16,10 +18,13 @@ public interface UserActivityHistoryRepository extends JpaRepository<UserActivit
     List<UserActivityHistory> findByUserId(Long userId);
     
  
-    List<UserActivityHistory> findByActivityDateBetweenOrderByActivityDateDesc(
-        LocalDateTime startDate,
-        LocalDateTime endDate
-    );
+    @Query("SELECT uah FROM UserActivityHistory uah " +
+           "LEFT JOIN FETCH uah.createdBy " +
+           "LEFT JOIN FETCH uah.updatedBy " +
+           "WHERE uah.activityDate BETWEEN :startDate AND :endDate " +
+           "ORDER BY uah.activityDate DESC")
+    List<UserActivityHistory> findAllWithCreatedByAndUpdatedBy(@Param("startDate") LocalDateTime startDate,
+                                                              @Param("endDate") LocalDateTime endDate);
     
  
     List<UserActivityHistory> findByActivityTypeCodeOrderByActivityDateDesc(String activityTypeCode);
