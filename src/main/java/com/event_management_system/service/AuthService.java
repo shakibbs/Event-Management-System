@@ -57,7 +57,7 @@ public class AuthService {
         }
 
         log.debug("[AuthService] DEBUG - authenticate() - Searching for user with email: " + loginRequest.getEmail());
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        User user = userRepository.findByEmailWithRoleAndPermissions(loginRequest.getEmail())
                 .orElseThrow(() -> {
                     log.warn("[AuthService] WARN - User not found with email: " + loginRequest.getEmail());
                     return new RuntimeException("Invalid credentials");
