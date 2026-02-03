@@ -98,7 +98,9 @@ public class PermissionService {
         }
 
         // SuperAdmin permissions
+        createPermissionIfNotExists("user.view.all", "Can view all users in the system");
         createPermissionIfNotExists("user.manage.all", "Can manage all users in the system");
+        createPermissionIfNotExists("role.view.all", "Can view all roles in the system");
         createPermissionIfNotExists("role.manage.all", "Can manage all roles in the system");
         createPermissionIfNotExists("event.manage.all", "Can manage all events in the system");
         createPermissionIfNotExists("event.approve", "Can approve pending events");
