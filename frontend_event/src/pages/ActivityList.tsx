@@ -90,7 +90,20 @@ export function ActivityList() {
 
   // Fetch all users for users with permission
   useEffect(() => {
-    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    // Check if user has the permission either directly or through role
+    const userPermissions = user?.permissions || [];
+    const rolePermissions = (user?.role && typeof user.role === 'object' && user.role.permissions) || [];
+    
+    // Permissions can be strings or objects with 'name' property
+    const hasPermission = (perms: any[], permName: string) => {
+      return perms.some((p: any) => 
+        typeof p === 'string' ? p === permName : p?.name === permName
+      );
+    };
+    
+    const hasAllHistoryPermission = hasPermission(userPermissions, 'history.view.all') || 
+                                     hasPermission(rolePermissions, 'history.view.all');
+    
     if (hasAllHistoryPermission) {
       apiRequest('/users?size=1000')
         .then((data) => {
@@ -102,8 +115,18 @@ export function ActivityList() {
 
   // Build API URL based on filters and role
   function buildApiUrl() {
-    // Users with permission: can filter by user, type, date
-    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    // Helper to check permission
+    const hasPermission = (perms: any[], permName: string) => {
+      return perms.some((p: any) => 
+        typeof p === 'string' ? p === permName : p?.name === permName
+      );
+    };
+    
+    const userPermissions = user?.permissions || [];
+    const rolePermissions = (user?.role && typeof user.role === 'object' && user.role.permissions) || [];
+    const hasAllHistoryPermission = hasPermission(userPermissions, 'history.view.all') || 
+                                     hasPermission(rolePermissions, 'history.view.all');
+    
     if (hasAllHistoryPermission) {
       // Treat both null and empty string as 'All users'
       const isAllUsers = selectedUserId === null || selectedUserId === '';
@@ -136,7 +159,17 @@ export function ActivityList() {
     setLoading(true);
     setError(null);
 
-    const hasAllHistoryPermission = user && Array.isArray(user.permissions) && user.permissions.includes('history.view.all');
+    // Helper to check permission
+    const hasPermission = (perms: any[], permName: string) => {
+      return perms.some((p: any) => 
+        typeof p === 'string' ? p === permName : p?.name === permName
+      );
+    };
+    
+    const userPermissions = user?.permissions || [];
+    const rolePermissions = (user?.role && typeof user.role === 'object' && user.role.permissions) || [];
+    const hasAllHistoryPermission = hasPermission(userPermissions, 'history.view.all') || 
+                                     hasPermission(rolePermissions, 'history.view.all');
     const isAllUsers = hasAllHistoryPermission && (selectedUserId === null || selectedUserId === '');
 
     if (isAllUsers) {
@@ -187,23 +220,38 @@ export function ActivityList() {
         {/* Filter Bar */}
         <div className="bg-surface rounded-xl shadow-md p-6 border border-surface-tertiary mb-8 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* SuperAdmin user filter */}
-            {user && user.role && (user.role === 'SuperAdmin' || (typeof user.role === 'object' && user.role.name === 'SuperAdmin')) && (
-              <div className="flex flex-col">
-                <label htmlFor="userFilter" className="text-sm font-semibold text-primary mb-2">User</label>
-                <select
-                  id="userFilter"
-                  className="border border-surface-tertiary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
-                  value={selectedUserId === null ? '' : selectedUserId}
-                  onChange={e => setSelectedUserId(e.target.value === '' ? null : e.target.value)}
-                >
-                  <option value="">All users</option>
-                  {users.map((u: any) => (
-                    <option key={u.id} value={u.id}>{u.name || u.username || u.email || `User #${u.id}`}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* User filter - shown only for users with history.view.all permission */}
+            {(() => {
+              const userPermissions = user?.permissions || [];
+              const rolePermissions = (user?.role && typeof user.role === 'object' && user.role.permissions) || [];
+              
+              // Permissions can be strings or objects with 'name' property
+              const hasPermission = (perms: any[], permName: string) => {
+                return perms.some((p: any) => 
+                  typeof p === 'string' ? p === permName : p?.name === permName
+                );
+              };
+              
+              const hasAllHistoryPermission = hasPermission(userPermissions, 'history.view.all') || 
+                                               hasPermission(rolePermissions, 'history.view.all');
+              
+              return hasAllHistoryPermission && (
+                <div className="flex flex-col">
+                  <label htmlFor="userFilter" className="text-sm font-semibold text-primary mb-2">User</label>
+                  <select
+                    id="userFilter"
+                    className="border border-surface-tertiary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+                    value={selectedUserId === null ? '' : selectedUserId}
+                    onChange={e => setSelectedUserId(e.target.value === '' ? null : e.target.value)}
+                  >
+                    <option value="">All users</option>
+                    {users.map((u: any) => (
+                      <option key={u.id} value={u.id}>{u.name || u.username || u.email || `User #${u.id}`}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
             {/* Activity type filter */}
             <div className="flex flex-col">
               <label htmlFor="typeFilter" className="text-sm font-semibold text-primary mb-2">Activity Type</label>
