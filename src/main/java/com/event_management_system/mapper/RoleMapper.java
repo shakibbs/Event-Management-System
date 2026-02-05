@@ -33,7 +33,6 @@ public class RoleMapper {
         dto.setId(entity.getId());
         dto.setName(entity.getName());
         
-        // Get permissions directly from entity relationship (no service/mapper injection needed)
         if (entity.getRolePermissions() != null && !entity.getRolePermissions().isEmpty()) {
             Set<PermissionResponseDTO> permissions = entity.getRolePermissions().stream()
                     .filter(rp -> rp.getPermission() != null)

@@ -213,10 +213,7 @@ public class RoleService {
     @PostConstruct
     @Transactional
     public void initializeDefaultRoles() {
-        // Temporarily force recreation - remove this check after first deployment
-        // if (roleRepository.count() > 0) {
-        //     return;
-        // }
+        
 
         log.info("[RoleService] INFO - Initializing default roles and permissions");
         

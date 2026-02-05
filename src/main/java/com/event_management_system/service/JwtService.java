@@ -70,7 +70,6 @@ public class JwtService {
                 
                 .signWith(getSigningKey());
         
-        // Add role information if provided (for access tokens)
         if (roleName != null) {
             builder.claim("role", roleName);
             builder.claim("roleId", roleId);

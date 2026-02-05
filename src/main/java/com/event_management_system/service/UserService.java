@@ -282,17 +282,12 @@ public class UserService {
             String deletedUserName = user.getFullName();
             String deletedUserEmail = user.getEmail();
 
-            // Delete all related records first
             try {
-                // Delete password history
                 passwordHistoryService.deleteAllByUserId(targetUserId);
-                // Delete login/logout history
                 if (loginLogoutHistoryService != null) {
                     loginLogoutHistoryService.deleteAllByUserId(targetUserId);
                 }
-                // Delete activity history
                 activityHistoryService.deleteAllByUserId(targetUserId);
-                // Delete event attendees
                 eventAttendeesRepository.deleteAll(eventAttendeesRepository.findByUser(user));
             } catch (Exception e) {
                 log.error("[UserService] ERROR - Failed to delete related records for userId=" + targetUserId + ": " + e.getMessage());

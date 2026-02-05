@@ -111,7 +111,6 @@ public class EventService {
         User user = userRepository.findById(currentUserId)
             .orElseThrow(() -> new RuntimeException("User not found for event creation: id=" + currentUserId));
         event.setOrganizer(user);
-        // Set createdBy to the user's email for audit and filtering
         event.recordCreation(user.getEmail());
         log.debug("[EventService] DEBUG - createEvent() - Set organizer and createdBy to user " + user.getId() + ", email: " + user.getEmail());
         Event savedEvent = eventRepository.save(event);
@@ -440,14 +439,12 @@ public class EventService {
 
         Event event = validateEvent(eventId, organizerId);
 
-        // Load CSV invitations (external emails)
         java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> csvFuture =
             java.util.concurrent.CompletableFuture.supplyAsync(
                 () -> loadExternalInvitesDirectFromCsv(file),
                 (java.util.concurrent.Executor) taskExecutor
             );
 
-        // Load temp_email invitations (pending emails from temp table)
         java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> tempFuture =
             java.util.concurrent.CompletableFuture.supplyAsync(
                 () -> {
@@ -459,7 +456,6 @@ public class EventService {
                 (java.util.concurrent.Executor) taskExecutor
             );
 
-        // Load registered users (excluding organizer)
         java.util.concurrent.CompletableFuture<java.util.List<com.event_management_system.dto.InviteAttendeeRequestDTO>> registeredFuture =
             java.util.concurrent.CompletableFuture.supplyAsync(
                 () -> loadRegisteredUsers(organizerId),
