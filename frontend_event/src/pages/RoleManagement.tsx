@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/rolePermissions';
+import { logger } from '../lib/logger';
 
 // Permission assignment modal UI (add/remove)
 function PermissionAssignmentModal({
@@ -161,7 +162,7 @@ export function RoleManagement() {
       try {
         roleData = await apiRequest(`/roles/${role.id}`);
       } catch (e) {
-        console.error('Failed to fetch role details:', e);
+        logger.error('Failed to fetch role details:', e);
       }
     }
     // Support both .rolePermissions (old) and .permissions (new, from RoleResponseDTO)

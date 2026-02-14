@@ -6,6 +6,7 @@ import { ViewType, Event } from '../../types';
 import { fetchEventsApi } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission, hasAnyPermission } from '../../utils/rolePermissions';
+import { logger } from '../../lib/logger';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -71,22 +72,22 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   // Only Admin can view users
   const baseItems = menuItems[0].items;
   
-    // Debug: Log user and permissions
-    console.log('Sidebar - Current user:', user);
-    console.log('Sidebar - User role:', user?.role);
-    console.log('Sidebar - Checking permissions for menu items');
+    // Debug: Log user and permissions (development only)
+    logger.debug('Sidebar - Current user:', user);
+    logger.debug('Sidebar - User role:', user?.role);
+    logger.debug('Sidebar - Checking permissions for menu items');
   
     // Show Users page for anyone with user.manage.own, user.view.all, or user.manage.all
     if (hasAnyPermission(user, ['user.view.all', 'user.manage.all', 'user.manage.own'])) {
-      console.log('Adding Users menu item');
+      logger.debug('Adding Users menu item');
       baseItems.push({ id: 'users', label: 'Users', icon: Hexagon });
     }
   if (hasPermission(user, 'role.manage.all')) {
-    console.log('Adding Roles menu item');
+    logger.debug('Adding Roles menu item');
     baseItems.push({ id: 'roles', label: 'Roles', icon: Hexagon });
   }
   if (hasPermission(user, 'role.manage.all')) {
-    console.log('Adding Permissions menu item');
+    logger.debug('Adding Permissions menu item');
     baseItems.push({ id: 'permissions', label: 'Permissions', icon: Hexagon });
   }
 

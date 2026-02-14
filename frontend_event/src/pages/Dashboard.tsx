@@ -8,6 +8,7 @@ import { fetchEventsApi, apiRequest } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Plus, Download, Calendar, Users, User } from 'lucide-react';
 import type { Event } from '../lib/api';
+import { logger } from '../lib/logger';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export function Dashboard() {
           const uData = await apiRequest('/users?size=1000');
           usersData = Array.isArray(uData) ? uData : (uData.content || []);
         } catch (e) {
-          console.warn('Failed to fetch users for dashboard stats', e);
+          logger.warn('Failed to fetch users for dashboard stats', e);
         }
 
         // 3. Calculate Metrics

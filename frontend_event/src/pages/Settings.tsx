@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { apiRequest } from '../lib/api';
 import { User, Mail, Phone, Lock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '../lib/logger';
 
 export function Settings() {
   const { user } = useAuth();
@@ -90,7 +91,7 @@ export function Settings() {
       localStorage.removeItem('eventflow_refresh_token');
       navigate('/login');
     } catch (err) {
-      console.error('Logout error:', err);
+      logger.error('Logout error:', err);
     }
   };
 

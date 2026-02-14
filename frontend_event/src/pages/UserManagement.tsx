@@ -7,16 +7,17 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission, hasAnyPermission, getUserPermissions } from '../utils/rolePermissions';
+import { logger } from '../lib/logger';
 
 
 export function UserManagement() {
   const { user } = useAuth();
-  // DEBUG: Log current user and permissions (detailed)
-  console.log('Current user (detailed):', JSON.stringify(user, null, 2));
+  // DEBUG: Log current user and permissions (detailed - development only)
+  logger.debug('Current user (detailed):', JSON.stringify(user, null, 2));
   const perms = getUserPermissions(user);
-  console.log('User permissions:', perms);
+  logger.debug('User permissions:', perms);
   if (Array.isArray(perms)) {
-    perms.forEach((p, i) => console.log(`Permission[${i}]:`, p));
+    perms.forEach((p, i) => logger.debug(`Permission[${i}]:`, p));
   }
   const navigate = useNavigate();
   const canView = hasAnyPermission(user, ['user.view.all', 'user.manage.all', 'user.manage.own']);

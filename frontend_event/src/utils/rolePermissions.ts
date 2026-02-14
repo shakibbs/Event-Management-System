@@ -1,35 +1,53 @@
 import { User } from '../types';
+import { logger } from '../lib/logger';
+
+// Cache for user permissions to avoid repeated computations
+let permissionCache: Map<string, string[]> = new Map();
 
 /**
  * Get all permission names for a user
  * Dynamically reads from user's role permissions from backend
+ * Results are cached to improve performance
  */
 export function getUserPermissions(user: User | null): string[] {
-  console.log('getUserPermissions called with user:', user);
+  // Create a cache key based on user ID and role ID
+  const cacheKey = user?.id && user?.role ? `${user.id}_${typeof user.role === 'object' ? user.role.id : user.role}` : 'none';
+  
+  // Return cached result if available
+  if (permissionCache.has(cacheKey)) {
+    logger.debug('Using cached permissions for user:', cacheKey);
+    return permissionCache.get(cacheKey) || [];
+  }
+  
+  logger.debug('Computing permissions for user:', cacheKey);
   
   if (!user || !user.role) {
-    console.log('No user or role found');
+    logger.debug('No user or role found');
+    permissionCache.set(cacheKey, []);
     return [];
   }
   
   // Handle both string role and object role with permissions
   if (typeof user.role === 'string') {
-    console.log('Role is a string:', user.role);
+    logger.debug('Role is a string:', user.role);
+    permissionCache.set(cacheKey, []);
     return [];
   }
   
   if (user.role && typeof user.role === 'object' && 'permissions' in user.role) {
     const permissions = user.role.permissions;
-    console.log('Found permissions in role:', permissions);
+    logger.debug('Found permissions in role:', permissions);
     
     if (Array.isArray(permissions)) {
       const permissionNames = permissions.map((p: any) => p.name || p);
-      console.log('Mapped permission names:', permissionNames);
+      logger.debug('Mapped permission names:', permissionNames);
+      permissionCache.set(cacheKey, permissionNames);
       return permissionNames;
     }
   }
   
-  console.log('No permissions array found');
+  logger.debug('No permissions array found');
+  permissionCache.set(cacheKey, []);
   return [];
 }
 
@@ -38,10 +56,10 @@ export function getUserPermissions(user: User | null): string[] {
  * This is dynamic - no hardcoded permission checks
  */
 export function hasPermission(user: User | null, permissionName: string): boolean {
-  console.log(`Checking permission: ${permissionName}`);
+  logger.debug(`Checking permission: ${permissionName}`);
   const permissions = getUserPermissions(user);
   const result = permissions.includes(permissionName);
-  console.log(`Permission "${permissionName}" check result:`, result);
+  logger.debug(`Permission "${permissionName}" check result:`, result);
   return result;
 }
 
@@ -59,6 +77,14 @@ export function hasAnyPermission(user: User | null, permissionNames: string[]): 
 export function hasAllPermissions(user: User | null, permissionNames: string[]): boolean {
   const permissions = getUserPermissions(user);
   return permissionNames.every(name => permissions.includes(name));
+}
+
+/**
+ * Clear the permission cache when user logs out
+ */
+export function clearPermissionCache(): void {
+  permissionCache.clear();
+  logger.debug('Permission cache cleared');
 }
 
 // Helper functions for role names (still useful for logging/display)

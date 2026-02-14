@@ -1,6 +1,7 @@
 
 
 import { useEffect, useState, useRef } from 'react';
+import { logger } from '../lib/logger';
 
 // Simple Toast Notification System
 function Toast({ message, onClose, type = 'info' }: { message: string, onClose: () => void, type?: 'info' | 'success' | 'error' }) {
@@ -82,7 +83,7 @@ export default function EventManagement() {
             (typeof creatorId === 'object' && creatorId?.id == user?.id);
           
           if (!userComparison) {
-            console.warn('Admin access denied for event:', eventData);
+            logger.warn('Admin access denied for event:', eventData);
             setError("You don't have permission to access this event");
             setLoading(false);
             return;
@@ -132,7 +133,7 @@ export default function EventManagement() {
         alert('Event deleted successfully!');
         navigate('/events');
       } catch (err: any) {
-        console.error('Delete event error:', err);
+        logger.error('Delete event error:', err);
         alert('Failed to delete event: ' + (err?.message || 'Unknown error'));
       }
     }
@@ -149,7 +150,7 @@ export default function EventManagement() {
       alert('Event held successfully!');
       window.location.reload();
     } catch (err: any) {
-      console.error('Hold event error:', err);
+      logger.error('Hold event error:', err);
       alert('Failed to hold event: ' + (err?.message || 'Unknown error'));
     }
   };
@@ -161,7 +162,7 @@ export default function EventManagement() {
       alert('Event reactivated successfully!');
       window.location.reload();
     } catch (err: any) {
-      console.error('Reactivate event error:', err);
+      logger.error('Reactivate event error:', err);
       alert('Failed to reactivate event: ' + (err?.message || 'Unknown error'));
     }
   };
@@ -173,7 +174,7 @@ export default function EventManagement() {
       alert('Event approved successfully!');
       window.location.reload();
     } catch (err: any) {
-      console.error('Approve event error:', err);
+      logger.error('Approve event error:', err);
       alert('Failed to approve event: ' + (err?.message || 'Unknown error'));
     }
   };
@@ -185,7 +186,7 @@ export default function EventManagement() {
       alert('Event rejected successfully!');
       window.location.reload();
     } catch (err: any) {
-      console.error('Reject event error:', err);
+      logger.error('Reject event error:', err);
       alert('Failed to reject event: ' + (err?.message || 'Unknown error'));
     }
   };

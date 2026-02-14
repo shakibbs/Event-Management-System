@@ -1,6 +1,8 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { User } from '../types';
 import { loginApi, registerApi } from '../lib/api';
+import { logger } from '../lib/logger';
+import { clearPermissionCache } from '../utils/rolePermissions';
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -20,7 +22,7 @@ export function AuthProvider({ children }: {children: React.ReactNode;}) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (e) {
-        console.error('Failed to parse user session');
+        logger.error('Failed to parse user session');
         localStorage.removeItem('eventflow_user');
       }
     }
@@ -34,11 +36,11 @@ export function AuthProvider({ children }: {children: React.ReactNode;}) {
       const user = data.user || data;
       const token = data.token || data.accessToken || data.jwt || data.access_token;
       
-      // Debug: Log user data to check role and permissions structure
-      console.log('Login response user:', user);
-      console.log('User role:', user.role);
+      // Debug: Log user data to check role and permissions structure (development only)
+      logger.debug('Login response user:', user);
+      logger.debug('User role:', user.role);
       if (user.role && typeof user.role === 'object') {
-        console.log('Role permissions:', user.role.permissions);
+        logger.debug('Role permissions:', user.role.permissions);
       }
       
       setUser(user);
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: {children: React.ReactNode;}) {
     setUser(null);
     localStorage.removeItem('eventflow_user');
     localStorage.removeItem('eventflow_token');
+    clearPermissionCache();
   };
   return (
     <AuthContext.Provider

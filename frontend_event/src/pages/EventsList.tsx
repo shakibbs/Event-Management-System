@@ -7,6 +7,7 @@ import { Event } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Plus } from 'lucide-react';
 import { fetchEventsApi, fetchOwnEventsApi, apiRequest } from '../lib/api';
+import { logger } from '../lib/logger';
 
 // Local type definitions
 interface FilterState {
@@ -262,7 +263,7 @@ export function EventsList() {
           const roleName = typeof user?.role === 'string' ? user?.role : (user?.role && typeof user?.role === 'object' ? (user?.role as any).name : '');
           if (roleName === 'SuperAdmin' || roleName === 'Admin') {
             return (event) => {
-              console.log('EventsList onRowClick:', event.id);
+              logger.debug('EventsList onRowClick:', event.id);
               navigate(`/event-management/${event.id}`);
             };
           }
