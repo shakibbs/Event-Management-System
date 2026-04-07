@@ -50,8 +50,11 @@ export default function EventManagement() {
     startTime: '',
     endTime: '',
     location: '',
-    visibility: 'PUBLIC'
+    visibility: 'PUBLIC',
+    eventImage: ''
   });
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,8 +118,10 @@ export default function EventManagement() {
           startTime: eventData.startTime || '',
           endTime: eventData.endTime || '',
           location: eventData.location || '',
-          visibility: eventData.visibility || 'PUBLIC'
+          visibility: eventData.visibility || 'PUBLIC',
+          eventImage: eventData.eventImage || ''
         });
+        setEditImagePreview(eventData.eventImage || null);
         setAttendees(Array.isArray(attendeesData) ? attendeesData : (attendeesData && typeof attendeesData === 'object' && Array.isArray(attendeesData.content) ? attendeesData.content : []));
         setError(null);
       })
@@ -141,6 +146,38 @@ export default function EventManagement() {
 
   const handleEdit = async () => {
     setShowEditModal(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image size must be less than 5MB', 'error');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file', 'error');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setEditImagePreview(base64);
+      setEditForm(prev => ({ ...prev, eventImage: base64 }));
+      showToast('Image selected successfully', 'success');
+    };
+    reader.onerror = () => {
+      showToast('Failed to read image file', 'error');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleHold = async () => {
@@ -194,6 +231,33 @@ export default function EventManagement() {
   const handleInvite = () => {
     setShowInviteModal(true);
   }
+
+  const handleEditSubmit = async () => {
+    if (!eventId) return;
+    
+    // Validation
+    if (!editForm.title.trim() || !editForm.location.trim() || !editForm.startTime.trim() || !editForm.endTime.trim()) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const updatedEvent = await updateEventApi(eventId, editForm);
+      showToast('Event updated successfully', 'success');
+      setEvent(updatedEvent);
+      setShowEditModal(false);
+      setEditImagePreview(null);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    } catch (err: any) {
+      logger.error('Update event error:', err);
+      showToast('Failed to update event: ' + (err?.message || 'Unknown error'), 'error');
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   // Toast helpers
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info', duration = 3500) => {
@@ -359,6 +423,13 @@ export default function EventManagement() {
                 <h2 className="text-2xl font-bold mb-2 text-white">{event.title}</h2>
                 <p className="text-gray-300 text-sm">{event.organizer && `Organized by ${event.organizer}`}</p>
               </div>
+
+              {/* Event Image */}
+              {event.eventImage && (
+                <div className="px-8 pt-6 pb-4">
+                  <img src={event.eventImage} alt={event.title} className="w-full h-64 object-cover rounded-lg border border-surface-tertiary shadow-md" />
+                </div>
+              )}
 
               {/* Status Badges */}
               <div className="px-8 pt-6 pb-2 flex flex-wrap gap-3 items-center border-b border-surface-tertiary">
@@ -646,6 +717,39 @@ export default function EventManagement() {
                   <option value="PUBLIC">Public</option>
                   <option value="PRIVATE">Private</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-primary mb-1">Event Image (Optional)</label>
+                <div className="border-2 border-dashed border-surface-tertiary rounded-lg p-4 text-center hover:border-accent transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={imageInputRef}
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="event-image-upload"
+                  />
+                  <label htmlFor="event-image-upload" className="cursor-pointer">
+                    <p className="text-text-primary font-medium">Click to upload image or drag and drop</p>
+                    <p className="text-xs text-text-secondary mt-1">Max size: 5MB. Formats: JPG, PNG, GIF, WebP</p>
+                  </label>
+                </div>
+                {editImagePreview && (
+                  <div className="mt-3 relative">
+                    <img src={editImagePreview} alt="Event preview" className="w-full h-40 object-cover rounded-lg border border-surface-tertiary" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditImagePreview(null);
+                        setEditForm(prev => ({ ...prev, eventImage: '' }));
+                        if (imageInputRef.current) imageInputRef.current.value = '';
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="border-t border-surface-tertiary px-6 py-4 flex gap-3 justify-end">

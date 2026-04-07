@@ -11,7 +11,7 @@ export type ViewType =
   'permissions' |
   'activity';
 
-export type PublicViewType = 'landing' | 'login' | 'register' | 'about';
+export type PublicViewType = 'landing' | 'all-events' | 'login' | 'register' | 'about';
 
 export interface Role {
   id?: string | number;

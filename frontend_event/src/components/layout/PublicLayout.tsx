@@ -3,6 +3,7 @@ import { motion, useScroll } from 'framer-motion';
 import { Hexagon, Menu, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { PublicViewType } from '../../types';
+import { useNavigate } from 'react-router-dom';
 interface PublicLayoutProps {
   children: React.ReactNode;
   currentView: PublicViewType;
@@ -16,11 +17,19 @@ export function PublicLayout({
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { scrollY } = useScroll();
+  const navigate = useNavigate();
+  
   useEffect(() => {
     return scrollY.onChange((latest) => {
       setIsScrolled(latest > 50);
     });
   }, [scrollY]);
+  
+  const handleLogoClick = () => {
+    console.log('Logo clicked, calling onViewChange("landing")');
+    onViewChange('landing');
+  };
+
   return (
     <div className="min-h-screen bg-warm-gray font-sans text-warm-text">
       {/* Navigation Bar */}
@@ -31,8 +40,8 @@ export function PublicLayout({
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => onViewChange('landing')}>
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleLogoClick}>
 
               <Hexagon
                 className="h-8 w-8 text-coral fill-coral/10"

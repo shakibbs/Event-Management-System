@@ -35,6 +35,7 @@ export function PublicEventCard({ event, index }: PublicEventCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
         <img
           src={
+          event.eventImage ||
           event.image ||
           `https://source.unsplash.com/random/800x600?event&sig=${event.id}`
           }

@@ -12,6 +12,7 @@ import { RoleManagement } from './pages/RoleManagement';
 import { PermissionManagement } from './pages/PermissionManagement';
 import { ActivityList } from './pages/ActivityList';
 import Landing from './pages/Landing';
+import AllEventsPage from './pages/AllEventsPage';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ViewType, PublicViewType } from './types';
@@ -74,17 +75,20 @@ function AppContent() {
   }
   // Public View (Template 4 - Event First)
   const renderPublicView = () => {
+    console.log('renderPublicView called with publicView:', publicView);
     switch (publicView) {
       case 'landing':
-        return <Landing onViewChange={setPublicView} />;
+        return <Landing key="landing-page" currentView={publicView} onViewChange={setPublicView} />;
+      case 'all-events':
+        return <AllEventsPage key="all-events-page" onBack={() => setPublicView('landing')} />;
       case 'login':
-        return <Login onViewChange={setPublicView} />;
+        return <Login key="login-page" onViewChange={setPublicView} />;
       case 'register':
-        return <Register onViewChange={setPublicView} />;
+        return <Register key="register-page" onViewChange={setPublicView} />;
       case 'about':
-        return <About />;
+        return <About key="about-page" />;
       default:
-        return <Landing onViewChange={setPublicView} />;
+        return <Landing key="landing-default" currentView={publicView} onViewChange={setPublicView} />;
     }
   };
   return (

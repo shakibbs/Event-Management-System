@@ -48,6 +48,9 @@ public class EventResponseDTO {
     @Schema(example = "UPCOMING", description = "Event status (UPCOMING, ONGOING, COMPLETED, INACTIVE, CANCELLED)")
     private Event.EventStatus eventStatus;
 
+    @Schema(description = "Event image in Base64 format")
+    private String eventImage;
+
     private Boolean deleted;
 
     private Long attendees;

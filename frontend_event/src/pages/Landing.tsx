@@ -16,22 +16,32 @@ import { useEffect } from 'react';
 import type { Event } from '../lib/api';
 
 interface LandingProps {
+  currentView?: PublicViewType;
   onViewChange: (view: PublicViewType) => void;
 }
 
-const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
-
+const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
 
   const [events, setEvents] = useState<Event[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showContact, setShowContact] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [dateQuery, setDateQuery] = useState('');
+
+  // Reset showAllEvents when Landing is loaded or when coming back from another view
+  useEffect(() => {
+    console.log('Landing useEffect triggered with currentView:', currentView);
+  }, [currentView]);
 
   useEffect(() => {
     setIsLoading(true);
     fetchPublicEventsApi()
       .then((arr) => {
         setEvents(arr);
+        setFilteredEvents(arr);
         setError(null);
       })
       .catch((err) => {
@@ -39,6 +49,47 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
       })
       .finally(() => setIsLoading(false));
   }, []);
+
+  const handleSearch = () => {
+    let results = events;
+
+    // Filter by search query (title or description)
+    if (searchQuery.trim()) {
+      results = results.filter((event) =>
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by location
+    if (locationQuery.trim()) {
+      results = results.filter((event) =>
+        event.location?.toLowerCase().trim().includes(locationQuery.toLowerCase().trim())
+      );
+    }
+
+    // Filter by date - use startTime property
+    if (dateQuery.trim()) {
+      results = results.filter((event) => {
+        if (!event.startTime) return false;
+        const eventDate = new Date(event.startTime).toLocaleDateString();
+        const queryDate = new Date(dateQuery).toLocaleDateString();
+        return eventDate === queryDate;
+      });
+    }
+
+    setFilteredEvents(results);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setLocationQuery('');
+    setDateQuery('');
+    setFilteredEvents(events);
+  };
+
+  // Display only first 4-5 events on landing page
+  const displayedEvents = filteredEvents.slice(0, 5);
 
   return (
     <div className="w-full">
@@ -79,13 +130,7 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
                   onClick={() => onViewChange('register')}
                   className="w-full sm:w-auto h-12 px-8 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg shadow-xl shadow-coral/20">
 
-                  Start for Free
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto h-12 px-8 rounded-full text-lg border-gray-300 hover:border-coral hover:text-coral bg-white">
-
-                  Browse Events
+                  Start your journey
                 </Button>
               </div>
             </motion.div>
@@ -112,6 +157,8 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
               <input
                 type="text"
                 placeholder="Search events, concerts, workshops..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent border-none focus:ring-0 text-gray-900 placeholder-gray-400" />
 
             </div>
@@ -120,20 +167,31 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
               <input
                 type="text"
                 placeholder="Location (e.g. San Francisco)"
+                value={locationQuery}
+                onChange={(e) => setLocationQuery(e.target.value)}
                 className="w-full bg-transparent border-none focus:ring-0 text-gray-900 placeholder-gray-400" />
 
             </div>
             <div className="flex-1 flex items-center px-4 pb-4 md:pb-0">
               <Calendar className="h-5 w-5 text-gray-400 mr-3" />
               <input
-                type="text"
-                placeholder="Any date"
+                type="date"
+                value={dateQuery}
+                onChange={(e) => setDateQuery(e.target.value)}
                 className="w-full bg-transparent border-none focus:ring-0 text-gray-900 placeholder-gray-400" />
 
             </div>
-            <Button className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl h-12 px-8">
-              Search
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleSearch} className="bg-gray-900 hover:bg-gray-800 text-white rounded-xl h-12 px-8">
+                Search
+              </Button>
+              <Button 
+                onClick={handleClearSearch} 
+                variant="outline"
+                className="bg-white hover:bg-gray-100 text-gray-900 border border-gray-300 rounded-xl h-12 px-8">
+                Clear
+              </Button>
+            </div>
           </motion.div>
         </div>
       </section>
@@ -145,13 +203,15 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
           <div className="flex items-end justify-between mb-12">
             <div>
               <h2 className="font-display text-4xl font-bold text-gray-900 mb-4">
-                Upcoming Events
+                Events
               </h2>
               <p className="text-gray-500 text-lg">
                 Curated experiences just for you
               </p>
             </div>
-            <button className="hidden sm:flex items-center text-coral font-medium hover:underline">
+            <button 
+              onClick={() => onViewChange('all-events')}
+              className="hidden sm:flex items-center text-coral font-medium hover:underline hover:text-coral-dark transition-colors">
               View all events <ArrowRight className="h-4 w-4 ml-2" />
             </button>
           </div>
@@ -163,13 +223,45 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
             {isLoading ? (
               <div className="col-span-full text-center text-gray-500">Loading events...</div>
             ) : (
-              events.length === 0 ? (
-                <div className="col-span-full text-center text-gray-500">No public upcoming events found.</div>
+              displayedEvents.length === 0 ? (
+                <div className="col-span-full text-center text-gray-500">
+                  {searchQuery || locationQuery || dateQuery
+                    ? 'No events found matching your search criteria.'
+                    : 'No public upcoming events found.'}
+                </div>
               ) : (
-                events.map((event, index) => (
-                  <div key={event.id} className="bg-white rounded-xl shadow p-6 flex flex-col justify-between">
-                    <h3 className="font-display text-2xl font-bold text-gray-900 mb-2">{event.title}</h3>
-                    <p className="text-gray-600">{event.description}</p>
+                displayedEvents.map((event, index) => (
+                  <div key={event.id} className="bg-white rounded-xl shadow overflow-hidden flex flex-col justify-between hover:shadow-lg transition-shadow">
+                    {/* Event Image */}
+                    {(event.eventImage || event.image) && (
+                      <div className="relative h-48 overflow-hidden bg-gray-200">
+                        <img 
+                          src={event.eventImage || event.image} 
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="p-6 flex flex-col justify-between h-full">
+                      <div>
+                        <h3 className="font-display text-2xl font-bold text-gray-900 mb-3">{event.title}</h3>
+                        <p className="text-gray-600 mb-4 line-clamp-2">{event.description}</p>
+                      </div>
+                      <div className="space-y-2 text-sm text-gray-500 border-t pt-4">
+                        {event.startTime && (
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 text-coral" />
+                            <span>{new Date(event.startTime).toLocaleDateString()} {new Date(event.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          </div>
+                        )}
+                        {event.location && (
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-2 text-coral" />
+                            <span>{event.location}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))
               )
@@ -177,7 +269,10 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
           </div>
 
           <div className="mt-12 text-center sm:hidden">
-            <Button variant="outline" className="w-full">
+            <Button 
+              onClick={() => onViewChange('all-events')}
+              variant="outline" 
+              className="w-full">
               View all events
             </Button>
           </div>
@@ -241,7 +336,7 @@ const Landing: React.FC<LandingProps> = ({ onViewChange }) => {
             <Button
               onClick={() => onViewChange('register')}
               className="w-full sm:w-auto h-14 px-10 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg font-medium">
-              Get Started for Free
+              Get your journey started
             </Button>
             <Button
               variant="outline"

@@ -35,6 +35,7 @@ public class EventMapper {
         }
         event.setLocation(dto.getLocation());
         event.setVisibility(dto.getVisibility());
+        event.setEventImage(dto.getEventImage());
         return event;
     }
 
@@ -73,6 +74,7 @@ public class EventMapper {
         }
         dto.setEventStatus(entity.getCurrentEventStatus());
         dto.setDeleted(entity.getDeleted());
+        dto.setEventImage(entity.getEventImage());
         // Set attendee count (accepted only)
         if (entity.getId() != null) {
             long attendeeCount = eventAttendeesRepository.countByEventAndInvitationStatus(entity, EventAttendees.InvitationStatus.ACCEPTED);
@@ -98,6 +100,9 @@ public class EventMapper {
         entity.setLocation(dto.getLocation());
         if (dto.getVisibility() != null) {
             entity.setVisibility(dto.getVisibility());
+        }
+        if (dto.getEventImage() != null) {
+            entity.setEventImage(dto.getEventImage());
         }
     }
 }

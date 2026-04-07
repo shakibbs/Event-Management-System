@@ -33,6 +33,9 @@ public class EventRequestDTO {
     @Schema(example = "PUBLIC", description = "Event visibility level (PUBLIC, PRIVATE)")
     private Event.Visibility visibility = Event.Visibility.PUBLIC;
 
+    @Schema(description = "Event image in Base64 format", example = "data:image/jpeg;base64,/9j/4AAQSkZJRgABA...")
+    private String eventImage;
+
     public boolean isDateRangeValid() {
         if (startTime == null || endTime == null)
             return false;

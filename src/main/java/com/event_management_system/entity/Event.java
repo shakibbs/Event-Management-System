@@ -105,6 +105,9 @@ public class Event extends BaseEntity {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(name = "event_image", columnDefinition = "LONGTEXT")
+    private String eventImage;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "event_status", nullable = false, length = 20)
     private EventStatus eventStatus = EventStatus.UPCOMING;
