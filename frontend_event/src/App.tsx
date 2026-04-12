@@ -80,7 +80,7 @@ function AppContent() {
       case 'landing':
         return <Landing key="landing-page" currentView={publicView} onViewChange={setPublicView} />;
       case 'all-events':
-        return <AllEventsPage key="all-events-page" onBack={() => setPublicView('landing')} />;
+        return <AllEventsPage key="all-events-page" onBack={() => setPublicView('landing')} onViewChange={setPublicView} />;
       case 'login':
         return <Login key="login-page" onViewChange={setPublicView} />;
       case 'register':

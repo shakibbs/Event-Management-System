@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DataTable } from '../components/DataTable';
+import { EventDetailModal } from '../components/EventDetailModal';
 import { FilterBar } from '../components/FilterBar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Event } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Plus } from 'lucide-react';
-import { fetchEventsApi, fetchOwnEventsApi, apiRequest } from '../lib/api';
+import { fetchEventsApi, apiRequest } from '../lib/api';
 import { logger } from '../lib/logger';
 
 // Local type definitions
@@ -36,7 +37,19 @@ export function EventsList() {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [eventForm, setEventForm] = useState<Partial<Event>>({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+  const [eventForm, setEventForm] = useState<Partial<Event>>({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC', eventImage: '' });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [registeringEventId, setRegisteringEventId] = useState<number | string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [registeredEventIds, setRegisteredEventIds] = useState<Set<number | string>>(new Set());
+  
+  // Detail modal state for attendees
+  const [selectedEventDetail, setSelectedEventDetail] = useState<Event | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Open modal if redirected from dashboard with ?create=1
   useEffect(() => {
@@ -45,7 +58,8 @@ export function EventsList() {
       setShowModal(true);
       setEditMode(false);
       setSelectedEvent(null);
-      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC', eventImage: '' });
+      setImagePreview(null);
       // Remove the query param from URL after opening
       navigate('/events', { replace: true });
     }
@@ -55,7 +69,39 @@ export function EventsList() {
     setShowModal(true);
     setEditMode(false);
     setSelectedEvent(null);
-    setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+    setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC', eventImage: '' });
+    setImagePreview(null);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setImagePreview(base64);
+      setEventForm(prev => ({ ...prev, eventImage: base64 }));
+    };
+    reader.onerror = () => {
+      alert('Failed to read image file');
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async (event: Event) => {
@@ -68,6 +114,40 @@ export function EventsList() {
         alert(err.message || 'Failed to delete event');
       }
     }
+  };
+
+  const handleRegisterEvent = async (eventId: number | string) => {
+    setRegisteringEventId(eventId);
+    try {
+      const { registerForPublicEventApi } = await import('../lib/api');
+      const message = await registerForPublicEventApi(eventId);
+      
+      // Only add to registered set on successful registration
+      setRegisteredEventIds(prev => new Set([...prev, eventId]));
+      
+      setSuccessMessage(`${message}`);
+      setError(null);
+      setTimeout(() => setSuccessMessage(null), 3000);
+      
+      // Refresh events to update registration status
+      const data = await fetchEventsApi(0, 100);
+      setEvents(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to register for event';
+      setError(errorMsg);
+      setSuccessMessage(null);
+      setTimeout(() => setError(null), 4000);
+      
+      // Re-throw the error so DataTable can catch it too
+      throw err;
+    } finally {
+      setRegisteringEventId(null);
+    }
+  };
+  
+  const handleViewEventDetails = (event: Event) => {
+    setSelectedEventDetail(event);
+    setShowDetailModal(true);
   };
 
   const handleModalSubmit = async (e: React.FormEvent) => {
@@ -99,7 +179,8 @@ export function EventsList() {
       setShowModal(false);
       setEditMode(false);
       setSelectedEvent(null);
-      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC' });
+      setEventForm({ title: '', location: '', startTime: '', endTime: '', description: '', visibility: 'PUBLIC', eventImage: '' });
+      setImagePreview(null);
       // Refresh events
       setIsLoading(true);
       fetchEventsApi(0, 100)
@@ -115,9 +196,6 @@ export function EventsList() {
       alert(err.message || 'Failed to save event');
     }
   };
-  const [events, setEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -255,10 +333,19 @@ export function EventsList() {
       {error && (
         <div className="text-red-500 text-sm">{error}</div>
       )}
+      {successMessage && (
+        <div className="text-green-600 text-center mb-4 p-4 bg-green-50 rounded-lg">
+          {successMessage}
+        </div>
+      )}
       <DataTable
         data={filteredEvents}
         isLoading={isLoading}
         onDelete={handleDelete}
+        onRegister={isAttendee ? handleRegisterEvent : undefined}
+        registeringEventId={registeringEventId}
+        isAttendee={isAttendee}
+        registeredEventIds={registeredEventIds}
         onRowClick={(() => {
           const roleName = typeof user?.role === 'string' ? user?.role : (user?.role && typeof user?.role === 'object' ? (user?.role as any).name : '');
           if (roleName === 'SuperAdmin' || roleName === 'Admin') {
@@ -267,9 +354,24 @@ export function EventsList() {
               navigate(`/event-management/${event.id}`);
             };
           }
+          // For attendees, show the detail modal
+          if (isAttendee) {
+            return handleViewEventDetails;
+          }
           return undefined;
         })()}
       />
+
+      {/* Event Detail Modal for Attendees */}
+      {isAttendee && (
+        <EventDetailModal
+          event={selectedEventDetail}
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          onRegister={handleRegisterEvent}
+          isRegistering={registeringEventId === selectedEventDetail?.id}
+        />
+      )}
 
       {/* Modal for add/edit event */}
       {showModal && (
@@ -329,6 +431,39 @@ export function EventsList() {
                 <option value="PUBLIC">Public</option>
                 <option value="PRIVATE">Private</option>
               </select>
+              <div>
+                <label className="block text-sm font-semibold text-primary mb-1">Event Image (Optional)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={imageInputRef}
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="event-image-upload-modal"
+                  />
+                  <label htmlFor="event-image-upload-modal" className="cursor-pointer">
+                    <p className="text-gray-700 font-medium">Click to upload image or drag and drop</p>
+                    <p className="text-xs text-gray-500 mt-1">Max size: 5MB. Formats: JPG, PNG, GIF, WebP</p>
+                  </label>
+                </div>
+                {imagePreview && (
+                  <div className="mt-3 relative">
+                    <img src={imagePreview} alt="Event preview" className="w-full h-40 object-cover rounded-lg border border-gray-300" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagePreview(null);
+                        setEventForm(prev => ({ ...prev, eventImage: '' }));
+                        if (imageInputRef.current) imageInputRef.current.value = '';
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" onClick={() => {
                   setShowModal(false);

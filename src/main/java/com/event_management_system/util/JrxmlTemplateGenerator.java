@@ -58,6 +58,10 @@ public class JrxmlTemplateGenerator {
     }
 
     public static String generateJrxmlForFields(Class<?> dtoClass, String[] selectedFields, String[] fieldLabels, String reportTitle) {
+        return generateJrxmlForFieldsWithNested(dtoClass, selectedFields, fieldLabels, reportTitle, null);
+    }
+
+    public static String generateJrxmlForFieldsWithNested(Class<?> dtoClass, String[] selectedFields, String[] fieldLabels, String reportTitle, String[] nestedFields) {
         StringBuilder jrxml = new StringBuilder();
         String className = dtoClass.getSimpleName();
         jrxml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -67,11 +71,17 @@ public class JrxmlTemplateGenerator {
             .append(java.util.UUID.randomUUID())
             .append("\">\n");
 
-        for (String fieldName : selectedFields) {
+        for (int i = 0; i < selectedFields.length; i++) {
+            String fieldName = selectedFields[i];
             try {
                 Field field = dtoClass.getDeclaredField(fieldName);
-                jrxml.append("    <field name=\"").append(field.getName()).append("\" class=\"")
-                    .append(field.getType().getName()).append("\"/>\n");
+                String fieldType = field.getType().getName();
+                // If this field has a nested property, we'll store it as String
+                if (nestedFields != null && i < nestedFields.length && nestedFields[i] != null) {
+                    fieldType = "java.lang.String";
+                }
+                jrxml.append("    <field name=\"").append(fieldName).append("\" class=\"")
+                    .append(fieldType).append("\"/>\n");
             } catch (NoSuchFieldException e) {
             }
         }
@@ -97,12 +107,18 @@ public class JrxmlTemplateGenerator {
 
         jrxml.append("    <detail>\n        <band height=\"20\">\n");
         x = 0;
-        for (String fieldName : selectedFields) {
+        for (int i = 0; i < selectedFields.length; i++) {
+            String fieldName = selectedFields[i];
+            String fieldExpression = fieldName;
+            // If this field has a nested property, use the nested path
+            if (nestedFields != null && i < nestedFields.length && nestedFields[i] != null) {
+                fieldExpression = fieldName + "." + nestedFields[i];
+            }
             jrxml.append("            <textField>\n                <reportElement x=\"").append(x).append("\" y=\"0\" width=\"")
                 .append(colWidth).append("\" height=\"20\"/>");
             jrxml.append("\n                <box>\n                    <pen lineWidth=\"0.5\"/>\n                </box>\n                <textElement verticalAlignment=\"Middle\"/>");
             jrxml.append("\n                <textFieldExpression><![CDATA[$F{")
-                .append(fieldName).append("}]]></textFieldExpression>\n            </textField>\n");
+                .append(fieldExpression).append("}]]></textFieldExpression>\n            </textField>\n");
             x += colWidth;
         }
         jrxml.append("        </band>\n    </detail>\n");
@@ -123,7 +139,7 @@ public class JrxmlTemplateGenerator {
         return jrxml.toString();
     }
 
-        public static void generateAndWriteJrxml(Class<?> dtoClass, String reportTitle, String filePath) throws IOException {
+    public static void generateAndWriteJrxml(Class<?> dtoClass, String reportTitle, String filePath) throws IOException {
             String jrxml = generateJrxmlForDto(dtoClass, reportTitle);
             File file = new File(filePath);
             File parent = file.getParentFile();

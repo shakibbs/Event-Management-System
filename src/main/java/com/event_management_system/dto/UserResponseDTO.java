@@ -15,4 +15,14 @@ public class UserResponseDTO {
     private String createdBy;
     private LocalDateTime updatedAt;
     private String updatedBy;
+    
+    // Transient field for PDF export - stores the role name as a string
+    private transient String roleName;
+    
+    public String getRoleName() {
+        if (roleName != null) {
+            return roleName;
+        }
+        return (role != null && role.getName() != null) ? role.getName() : "N/A";
+    }
 }

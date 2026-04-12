@@ -79,8 +79,26 @@ public class EventMapper {
         if (entity.getId() != null) {
             long attendeeCount = eventAttendeesRepository.countByEventAndInvitationStatus(entity, EventAttendees.InvitationStatus.ACCEPTED);
             dto.setAttendees(attendeeCount);
+            
+            // Set attendee IDs for frontend filtering
+            java.util.List<Long> attendeeIds = eventAttendeesRepository.findByEventAndInvitationStatus(entity, EventAttendees.InvitationStatus.ACCEPTED)
+                .stream()
+                .map(ea -> ea.getUser() != null ? ea.getUser().getId() : null)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toList());
+            dto.setAttendeeIds(attendeeIds);
+            
+            // Set invited IDs for frontend filtering
+            java.util.List<Long> invitedIds = eventAttendeesRepository.findByEventAndInvitationStatus(entity, EventAttendees.InvitationStatus.PENDING)
+                .stream()
+                .map(ea -> ea.getUser() != null ? ea.getUser().getId() : null)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toList());
+            dto.setInvitedIds(invitedIds);
         } else {
             dto.setAttendees(0L);
+            dto.setAttendeeIds(java.util.Collections.emptyList());
+            dto.setInvitedIds(java.util.Collections.emptyList());
         }
         return dto;
     }

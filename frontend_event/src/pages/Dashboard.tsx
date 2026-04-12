@@ -4,7 +4,8 @@ import { isAttendee } from '../utils/rolePermissions';
 import { useNavigate } from 'react-router-dom';
 import { MetricCard } from '../components/MetricCard';
 import { DataTable } from '../components/DataTable';
-import { fetchEventsApi, apiRequest } from '../lib/api';
+import { EventDetailModal } from '../components/EventDetailModal';
+import { fetchEventsApi, apiRequest, registerForPublicEventApi } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Plus, Download, Calendar, Users, User } from 'lucide-react';
 import type { Event } from '../lib/api';
@@ -22,6 +23,9 @@ export function Dashboard() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEventDetail, setSelectedEventDetail] = useState<Event | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [registeringEventId, setRegisteringEventId] = useState<number | string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,12 +73,38 @@ export function Dashboard() {
     loadData();
   }, []);
 
+  const handleViewEventDetails = (event: Event) => {
+    setSelectedEventDetail(event);
+    setShowDetailModal(true);
+  };
+
+  const handleRegisterEvent = async (eventId: number | string) => {
+    setRegisteringEventId(eventId);
+    try {
+      const message = await registerForPublicEventApi(eventId);
+      logger.info('Successfully registered for event:', eventId);
+      // Refresh events
+      const updatedEvents = await fetchEventsApi(0, 100);
+      setEvents(updatedEvents);
+    } catch (err: any) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to register for event';
+      logger.error('Failed to register for event:', errorMsg);
+      throw err;
+    } finally {
+      setRegisteringEventId(null);
+    }
+  };
+
   const attendee = isAttendee(user);
   const realMetrics = attendee
     ? [
         {
           label: 'My Upcoming Events',
-          value: events.filter(e => Array.isArray(e.attendees) && e.attendees.some((a: any) => a.id === user?.id) && new Date(e.startTime || e.date) > new Date()).length.toString(),
+          value: events.filter(e => {
+            const isAttending = (e as any).attendeeIds && Array.isArray((e as any).attendeeIds) && (e as any).attendeeIds.includes(user?.id);
+            const isFuture = e.startTime && new Date(e.startTime) > new Date();
+            return isAttending && isFuture;
+          }).length.toString(),
           trend: 0,
           trendLabel: 'Events you are attending',
           change: 0,
@@ -82,7 +112,7 @@ export function Dashboard() {
         },
         {
           label: 'Invitations',
-          value: events.filter(e => Array.isArray(e.invited) && e.invited.some((a: any) => a.id === user?.id)).length.toString(),
+          value: events.filter(e => (e as any).invitedIds && Array.isArray((e as any).invitedIds) && (e as any).invitedIds.includes(user?.id)).length.toString(),
           trend: 0,
           trendLabel: 'Pending invitations',
           change: 0,
@@ -126,7 +156,7 @@ export function Dashboard() {
 
   // For Admin/SuperAdmin: show latest events; for Attendee: show their events
   const recentEvents = attendee
-    ? events.filter(e => Array.isArray(e.attendees) && e.attendees.some((a: any) => a.id === user?.id)).slice(0, 5)
+    ? events.filter(e => (e as any).attendeeIds && Array.isArray((e as any).attendeeIds) && (e as any).attendeeIds.includes(user?.id)).slice(0, 5)
     : events.slice(0, 5);
 
   return (
@@ -173,8 +203,26 @@ export function Dashboard() {
         {error && (
           <div className="text-red-500 text-sm">{error}</div>
         )}
-        <DataTable data={recentEvents} isLoading={isLoading} />
+        <DataTable 
+          data={recentEvents} 
+          isLoading={isLoading}
+          onRowClick={attendee ? handleViewEventDetails : undefined}
+          onRegister={attendee ? handleRegisterEvent : undefined}
+          registeringEventId={registeringEventId}
+          isAttendee={attendee}
+        />
       </div>
+
+      {/* Event Detail Modal for Attendees */}
+      {attendee && (
+        <EventDetailModal
+          event={selectedEventDetail}
+          isOpen={showDetailModal}
+          onClose={() => setShowDetailModal(false)}
+          onRegister={handleRegisterEvent}
+          isRegistering={registeringEventId === selectedEventDetail?.id}
+        />
+      )}
     </div>
   );
 }

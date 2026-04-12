@@ -11,8 +11,9 @@ import {
 import { Button } from '../components/ui/Button';
 import { PublicEventCard } from '../components/PublicEventCard';
 import { PublicViewType } from '../types';
-import { fetchPublicEventsApi } from '../lib/api';
+import { fetchPublicEventsApi, registerForPublicEventApi } from '../lib/api';
 import { useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import type { Event } from '../lib/api';
 
 interface LandingProps {
@@ -22,6 +23,7 @@ interface LandingProps {
 
 const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
 
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +32,8 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
+  const [registeringEventId, setRegisteringEventId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Reset showAllEvents when Landing is loaded or when coming back from another view
   useEffect(() => {
@@ -88,6 +92,27 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
     setFilteredEvents(events);
   };
 
+  const handleRegisterEvent = async (eventId: number | string) => {
+    if (!user) {
+      setError('Please log in to register for events');
+      return;
+    }
+
+    setRegisteringEventId(Number(eventId));
+    try {
+      const message = await registerForPublicEventApi(eventId);
+      setSuccessMessage(`${message}`);
+      setError(null);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to register for event';
+      setError(errorMsg);
+      setSuccessMessage(null);
+    } finally {
+      setRegisteringEventId(null);
+    }
+  };
+
   // Display only first 4-5 events on landing page
   const displayedEvents = filteredEvents.slice(0, 5);
 
@@ -126,12 +151,11 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button
+                <button
                   onClick={() => onViewChange('register')}
-                  className="w-full sm:w-auto h-12 px-8 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg shadow-xl shadow-coral/20">
-
+                  className="w-full sm:w-auto h-12 px-8 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg shadow-xl shadow-coral/20 font-medium transition-all duration-200 cursor-pointer active:scale-95">
                   Start your journey
-                </Button>
+                </button>
               </div>
             </motion.div>
           </div>
@@ -200,6 +224,18 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
       {/* Featured Events */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {error && (
+            <div className="text-red-500 text-center mb-8 p-4 bg-red-50 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="text-green-600 text-center mb-8 p-4 bg-green-50 rounded-lg">
+              {successMessage}
+            </div>
+          )}
+
           <div className="flex items-end justify-between mb-12">
             <div>
               <h2 className="font-display text-4xl font-bold text-gray-900 mb-4">
@@ -247,7 +283,7 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
                         <h3 className="font-display text-2xl font-bold text-gray-900 mb-3">{event.title}</h3>
                         <p className="text-gray-600 mb-4 line-clamp-2">{event.description}</p>
                       </div>
-                      <div className="space-y-2 text-sm text-gray-500 border-t pt-4">
+                      <div className="space-y-3 text-sm text-gray-500 border-t pt-4">
                         {event.startTime && (
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-2 text-coral" />
@@ -260,6 +296,25 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
                             <span>{event.location}</span>
                           </div>
                         )}
+
+                        <div className="pt-2 mt-4">
+                          {user ? (
+                            <Button
+                              onClick={() => handleRegisterEvent(event.id)}
+                              disabled={registeringEventId === event.id}
+                              className="w-full bg-coral hover:bg-coral-dark text-white rounded-lg h-10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                              {registeringEventId === event.id ? 'Registering...' : 'Register Now'}
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => onViewChange('login')}
+                              className="w-full bg-coral hover:bg-coral-dark text-white rounded-lg h-10 text-sm font-medium transition-all"
+                            >
+                              Log in to Register
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -333,17 +388,16 @@ const Landing: React.FC<LandingProps> = ({ currentView, onViewChange }) => {
             and grow their events.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button
+            <button
               onClick={() => onViewChange('register')}
-              className="w-full sm:w-auto h-14 px-10 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg font-medium">
+              className="w-full sm:w-auto h-14 px-10 bg-coral hover:bg-coral-dark text-white border-none rounded-full text-lg font-medium transition-all duration-200 cursor-pointer active:scale-95">
               Get your journey started
-            </Button>
-            <Button
-              variant="outline"
+            </button>
+            <button
               onClick={() => setShowContact(true)}
-              className="w-full sm:w-auto h-14 px-10 rounded-full text-lg border-gray-700 hover:bg-gray-800 text-white">
+              className="w-full sm:w-auto h-14 px-10 rounded-full text-lg border-2 border-gray-700 hover:bg-gray-800 text-white transition-all duration-200 cursor-pointer font-medium">
               Contact Sales
-            </Button>
+            </button>
           </div>
           {showContact && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

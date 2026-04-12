@@ -271,6 +271,11 @@ public class EventService {
             return true;
         }
 
+        // Check if user is an attendee (accepted or registered for the event)
+        if (isUserAttendingEvent(event, userId)) {
+            return true;
+        }
+
         if (event.getVisibility() != null) {
             if (event.getVisibility() == Event.Visibility.PUBLIC) {
                 return hasPermission(userId, "event.view.public");
@@ -297,6 +302,16 @@ public class EventService {
     }
 
     private boolean isUserInvitedToEvent(Event event, @NonNull Long userId) {
+        var user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return false;
+        }
+
+        return eventAttendeesRepository.findByUser(user).stream()
+                .anyMatch(ea -> Objects.equals(ea.getEvent().getId(), event.getId()));
+    }
+
+    private boolean isUserAttendingEvent(Event event, @NonNull Long userId) {
         var user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return false;

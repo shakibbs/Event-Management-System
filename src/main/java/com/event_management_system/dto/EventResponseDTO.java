@@ -54,4 +54,10 @@ public class EventResponseDTO {
     private Boolean deleted;
 
     private Long attendees;
+
+    @Schema(description = "List of attendee user IDs for frontend filtering")
+    private java.util.List<Long> attendeeIds;
+
+    @Schema(description = "List of invited user IDs for frontend filtering")
+    private java.util.List<Long> invitedIds;
 }

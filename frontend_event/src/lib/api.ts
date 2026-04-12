@@ -119,6 +119,13 @@ export async function fetchPublicEventsApi(): Promise<Event[]> {
   return [];
 }
 
+// Self-register for a public event (requires authentication)
+export async function registerForPublicEventApi(eventId: string | number) {
+  return apiRequest<string>(`/events/${eventId}/register`, {
+    method: 'POST',
+  });
+}
+
 // Environment variable for API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8083/api';
 console.log('API Base URL:', API_BASE_URL); // Debug log
@@ -171,15 +178,38 @@ export async function apiRequest<T = any>(path: string, options: RequestInit = {
     headers,
     credentials: 'include',
   });
+  
   let data;
+  let rawText = '';
   try {
-    data = await response.json();
+    rawText = await response.text();
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        // If JSON parsing fails, keep the raw text as data
+        data = rawText;
+      }
+    } else {
+      data = {};
+    }
   } catch {
     data = {};
   }
+  
   if (!response.ok) {
-    const error: ApiError = data;
-    throw new Error(error.message || response.statusText);
+    // Handle both JSON error objects and plain string responses from backend
+    let errorMessage = response.statusText;
+    
+    if (typeof data === 'string' && data.length > 0) {
+      // Backend returned a plain string error message
+      errorMessage = data;
+    } else if (data && typeof data === 'object' && data.message) {
+      // Backend returned a JSON object with a message property
+      errorMessage = data.message;
+    }
+    
+    throw new Error(errorMessage);
   }
   return data;
 }

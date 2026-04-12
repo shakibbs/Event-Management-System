@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Calendar, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { fetchPublicEventsApi } from '../lib/api';
+import { EventDetailModal } from '../components/EventDetailModal';
+import { fetchPublicEventsApi, registerForPublicEventApi } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 import type { Event } from '../lib/api';
 
 interface AllEventsPageProps {
   onBack: () => void;
+  onViewChange?: (view: string) => void;
 }
 
-const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
+const AllEventsPage: React.FC<AllEventsPageProps> = ({ onViewChange }) => {
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +21,11 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
   const [dateQuery, setDateQuery] = useState('');
+  const [registeringEventId, setRegisteringEventId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectedEventDetail, setSelectedEventDetail] = useState<Event | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [registeredEventIds, setRegisteredEventIds] = useState<Set<number | string>>(new Set());
 
   useEffect(() => {
     setIsLoading(true);
@@ -65,6 +74,44 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
     setLocationQuery('');
     setDateQuery('');
     setFilteredEvents(events);
+  };
+
+  const handleViewEventDetails = (event: Event) => {
+    setSelectedEventDetail(event);
+    setShowDetailModal(true);
+  };
+
+  const handleRegisterEvent = async (eventId: number | string) => {
+    if (!user) {
+      setError('Please log in to register for events');
+      return;
+    }
+
+    setRegisteringEventId(Number(eventId));
+    try {
+      const message = await registerForPublicEventApi(eventId);
+      setSuccessMessage(`${message}`);
+      setError(null);
+      
+      // Add event to registered set
+      setRegisteredEventIds(prev => new Set(prev).add(eventId));
+      
+      // Update the selected event if modal is open
+      if (selectedEventDetail?.id === eventId) {
+        setSelectedEventDetail(prev => 
+          prev ? { ...prev, attendees: Array.isArray(prev.attendees) ? [...prev.attendees, user] : [user] } : null
+        );
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to register for event';
+      setError(errorMsg);
+      setSuccessMessage(null);
+    } finally {
+      setRegisteringEventId(null);
+    }
   };
 
   return (
@@ -140,6 +187,12 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
             </div>
           )}
 
+          {successMessage && (
+            <div className="text-green-600 text-center mb-8 p-4 bg-green-50 rounded-lg">
+              {successMessage}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="text-center py-16 text-gray-500">
               <div className="inline-block">
@@ -175,7 +228,8 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                    className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col justify-between group border border-gray-100"
+                    onClick={() => handleViewEventDetails(event)}
+                    className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all overflow-hidden flex flex-col justify-between group border border-gray-100 h-full cursor-pointer"
                   >
                     {/* Event Image */}
                     {(event.eventImage || event.image) && (
@@ -187,7 +241,7 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
                         />
                       </div>
                     )}
-                    <div className="p-6 flex flex-col justify-between h-full">
+                    <div className="p-6 flex flex-col justify-between flex-1">
                       <div>
                         <h3 className="font-display text-xl font-bold text-gray-900 mb-3 group-hover:text-coral transition-colors">
                           {event.title}
@@ -216,6 +270,31 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
                           </div>
                         )}
                       </div>
+
+                      <div className="pt-4 mt-auto">
+                        {user ? (
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRegisterEvent(event.id);
+                            }}
+                            disabled={registeringEventId === event.id}
+                            className="w-full bg-coral hover:bg-coral-dark text-white rounded-lg h-10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {registeringEventId === event.id ? 'Registering...' : 'Register Now'}
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewChange?.('login');
+                            }}
+                            className="w-full bg-coral hover:bg-coral-dark text-white rounded-lg h-10 text-sm font-medium transition-all"
+                          >
+                            Log in to Register
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -224,6 +303,16 @@ const AllEventsPage: React.FC<AllEventsPageProps> = ({ onBack }) => {
           )}
         </div>
       </section>
+
+      {/* Event Detail Modal */}
+      <EventDetailModal
+        event={selectedEventDetail}
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        onRegister={handleRegisterEvent}
+        isRegistering={registeringEventId === selectedEventDetail?.id}
+        isAlreadyRegistered={registeredEventIds.has(selectedEventDetail?.id || 0)}
+      />
     </div>
   );
 };
