@@ -17,8 +17,6 @@ public interface RolePermissionRepository extends JpaRepository<RolePermission, 
   
     List<RolePermission> findByRole(Role role);
 
-    Optional<RolePermission> findByRoleIdAndPermissionId(Long roleId, Long permissionId);
-
   
     Optional<RolePermission> findByRoleAndPermission(Role role, Permission permission);
 

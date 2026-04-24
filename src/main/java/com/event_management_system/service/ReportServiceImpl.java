@@ -44,7 +44,7 @@ public class ReportServiceImpl implements ReportService {
             throw new IllegalArgumentException("Users list is empty");
         }
         Class<?> dtoClass = users.get(0).getClass();
-        String[] selectedFields = {"fullName", "email", "roleName"};
+        String[] selectedFields = {"fullName", "email", "role"};
         String[] fieldLabels = {"Name", "Email", "User Role"};
         String jrxml = JrxmlTemplateGenerator.generateJrxmlForFields(dtoClass, selectedFields, fieldLabels, "Users List");
         InputStream jrxmlStream = new ByteArrayInputStream(jrxml.getBytes(StandardCharsets.UTF_8));

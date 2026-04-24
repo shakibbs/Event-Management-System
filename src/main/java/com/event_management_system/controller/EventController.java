@@ -165,50 +165,6 @@ public class EventController {
                 return ResponseEntity.ok(events);
         }
 
-        @PostMapping("/{eventId}/register")
-        @Operation(summary = "Self-register for a public event", description = "Allows an authenticated attendee to self-register for a PUBLIC event. No invitation required.")
-        @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully registered for the event"),
-                        @ApiResponse(responseCode = "400", description = "Invalid request, event already attended, or event has already started"),
-                        @ApiResponse(responseCode = "403", description = "User lacks permission to attend events or event is not PUBLIC"),
-                        @ApiResponse(responseCode = "404", description = "Event not found"),
-                        @ApiResponse(responseCode = "500", description = "Internal server error")
-        })
-        public ResponseEntity<String> registerForPublicEvent(
-                        @Parameter(description = "Unique identifier of the public event", required = true, example = "1") @PathVariable @NonNull Long eventId,
-                        Authentication authentication) {
-
-                try {
-                        log.trace("registerForPublicEvent() called with eventId={}, timestamp={}",
-                                        eventId, System.currentTimeMillis());
-
-                        log.debug("POST /api/events/{}/register - Registering user for public event", eventId);
-
-                        String email = authentication.getName();
-                        User currentUser = userRepository.findByEmail(email)
-                                        .orElseThrow(() -> new ResourceNotFoundException(
-                                                        "User not found with email: " + email));
-
-                        log.debug("User authenticated: userId={}, email={}", currentUser.getId(), email);
-
-                        boolean registered = eventService.attendPublicEvent(eventId, currentUser.getId());
-
-                        if (registered) {
-                                log.info("User successfully registered for public event: eventId={}, userId={}", eventId, currentUser.getId());
-                                return ResponseEntity.ok("You have successfully registered for the event");
-                        } else {
-                                log.warn("User already registered for event: eventId={}, userId={}", eventId, currentUser.getId());
-                                return ResponseEntity.badRequest().body("You are already registered for this event");
-                        }
-                } catch (RuntimeException e) {
-                        log.error("Failed to register for public event: eventId={}, error={}", eventId, e.getMessage());
-                        return ResponseEntity.badRequest().body(e.getMessage());
-                } catch (Exception e) {
-                        log.error("Failed to register for public event: eventId={}", eventId, e);
-                        throw e;
-                }
-        }
-
         @GetMapping("/{id}")
         @Operation(summary = "Get event by ID", description = "Retrieves a specific event by its unique identifier")
         @ApiResponses(value = {

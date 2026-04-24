@@ -1,33 +1,33 @@
-# Use a supported OpenJDK runtime as a parent image
-FROM eclipse-temurin:17-jdk-jammy
+# Build stage - Use Eclipse Temurin JDK 17 and install Maven
+FROM eclipse-temurin:17-jdk-jammy as builder
+
+# Install Maven
+RUN apt-get update && apt-get install -y maven && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the Maven wrapper and pom.xml
-COPY .mvn .mvn
-COPY mvnw pom.xml ./
-
-# Give execute permissions to mvnw
-RUN chmod +x mvnw
-
-# Download dependencies (will be cached if pom.xml and .mvn haven't changed)
-RUN ./mvnw dependency:go-offline
-
-# Copy the rest of the source code
-COPY . .
-
-# Give execute permissions to mvnw again (after COPY . .)
-RUN chmod +x mvnw
+# Copy pom.xml and source code
+COPY pom.xml .
+COPY src ./src
 
 # Build the application
-RUN ./mvnw clean package -DskipTests
+RUN mvn clean package -DskipTests
 
-# Copy the built jar to the working directory (adjust the jar name if needed)
-RUN cp target/*.jar app.jar
+# Runtime stage - Use Eclipse Temurin JRE 17 (smaller image)
+FROM eclipse-temurin:17-jre-jammy
 
-# Expose the port (Render will set $PORT)
-EXPOSE 10000
+WORKDIR /app
 
-# Run the jar file
-CMD ["java", "-jar", "app.jar"]
+# Copy the built jar from builder stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Expose the port (Render will set PORT environment variable)
+EXPOSE 8080
+
+# Use entrypoint script to properly handle environment variables
+ENTRYPOINT ["/app/entrypoint.sh"]

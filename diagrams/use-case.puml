@@ -1,0 +1,45 @@
+@startuml
+' EventFlow - Use Case Diagram (simple)
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "Attendee" as Attendee
+actor "Admin" as Admin
+actor "SuperAdmin" as SuperAdmin
+
+rectangle "EventFlow (Event Management System)" {
+  usecase "Register / Login" as UC_Auth
+
+  usecase "Browse Events" as UC_Browse
+  usecase "Register for Event" as UC_RegisterEvent
+  usecase "Accept/Decline Invitation" as UC_RespondInvite
+
+  usecase "Create / Manage Event" as UC_ManageEvent
+  usecase "Invite Attendees" as UC_Invite
+
+  usecase "Approve / Reject Event" as UC_ApproveReject
+  usecase "Hold / Reactivate Event" as UC_HoldReactivate
+
+  usecase "Manage Users / Roles / Permissions" as UC_AdminManagement
+  usecase "Reports / Analytics" as UC_Reports
+}
+
+Attendee --> UC_Auth
+Attendee --> UC_Browse
+Attendee --> UC_RegisterEvent
+Attendee --> UC_RespondInvite
+
+Admin --> UC_Auth
+Admin --> UC_ManageEvent
+Admin --> UC_Invite
+Admin --> UC_Reports
+
+' Keep one actor on the right side (SuperAdmin)
+SuperAdmin -left-> UC_Auth
+SuperAdmin -left-> UC_ApproveReject
+SuperAdmin -left-> UC_HoldReactivate
+SuperAdmin -left-> UC_AdminManagement
+SuperAdmin -left-> UC_Reports
+
+@enduml

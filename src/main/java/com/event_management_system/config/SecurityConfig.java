@@ -44,12 +44,10 @@ public class SecurityConfig {
                 // CORS configuration
                 .cors(cors -> cors.configurationSource(request -> {
                     var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-                    // Allow frontend origins from environment variable + localhost for development
-                    String frontendUrl = System.getenv().getOrDefault("FRONTEND_URL", "http://localhost:5173");
                     corsConfig.setAllowedOriginPatterns(java.util.List.of(
-                        frontendUrl,
                         "http://localhost:5173", 
                         "http://localhost:*",
+                        "https://event-frontend-mauve.vercel.app",
                         "https://*.vercel.app"
                     ));
                     corsConfig.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

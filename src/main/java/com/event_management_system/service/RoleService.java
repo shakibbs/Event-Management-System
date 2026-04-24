@@ -7,7 +7,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +24,6 @@ import com.event_management_system.repository.RoleRepository;
 import jakarta.annotation.PostConstruct;
 
 @Service
-@DependsOn("permissionService")
 public class RoleService {
 
     @Autowired
@@ -213,12 +211,12 @@ public class RoleService {
     @PostConstruct
     @Transactional
     public void initializeDefaultRoles() {
-        
+        if (roleRepository.count() > 0) {
+            return;
+        }
 
-        log.info("[RoleService] INFO - Initializing default roles and permissions");
-        
         createRoleWithPermissions("SuperAdmin", 
-                "user.manage.all", "user.view.all", "role.manage.all", "role.view.all", "event.manage.all", "event.approve", 
+                "user.manage.all", "user.view.all", "role.manage.all", "event.manage.all", "event.approve", 
                 "event.hold", "event.reactivate", "system.config", "history.view.all");
 
         createRoleWithPermissions("Admin", 
@@ -227,52 +225,22 @@ public class RoleService {
 
         createRoleWithPermissions("Attendee", 
                 "event.view.public", "event.view.invited", "event.attend", "history.view.own");
-        
-        log.info("[RoleService] INFO - Default roles initialization completed");
     }
     
     private void createRoleWithPermissions(String roleName, String... permissionNames) {
-        log.debug("[RoleService] DEBUG - Creating/updating role: {}", roleName);
-        
-        Optional<Role> roleOpt = roleRepository.findByName(roleName);
-        final Role role;
-        
-        if (!roleOpt.isPresent()) {
-            Role newRole = new Role();
-            newRole.setName(roleName);
-            newRole.recordCreation("system");
-            role = roleRepository.save(newRole);
-            log.info("[RoleService] INFO - Created new role: {} with id={}", roleName, role.getId());
-        } else {
-            role = roleOpt.get();
-            log.debug("[RoleService] DEBUG - Role already exists: {} with id={}", roleName, role.getId());
-        }
-        
-        int assignedCount = 0;
-        int skippedCount = 0;
-        int notFoundCount = 0;
-        
-        for (String permissionName : permissionNames) {
-            Optional<Permission> permOpt = permissionRepository.findByName(permissionName);
-            if (permOpt.isPresent()) {
-                Permission permission = permOpt.get();
-                boolean exists = rolePermissionRepository.findByRoleIdAndPermissionId(role.getId(), permission.getId()).isPresent();
-                if (!exists) {
-                    RolePermission rolePermission = new RolePermission(role, permission);
+        if (!roleRepository.findByName(roleName).isPresent()) {
+            Role role = new Role();
+            role.setName(roleName);
+            role.recordCreation("system");
+            Role savedRole = roleRepository.save(role);
+            
+            for (String permissionName : permissionNames) {
+                permissionRepository.findByName(permissionName).ifPresent(permission -> {
+                    RolePermission rolePermission = new RolePermission(savedRole, permission);
                     rolePermissionRepository.save(rolePermission);
-                    assignedCount++;
-                    log.debug("[RoleService] DEBUG - Assigned permission '{}' to role '{}'", permissionName, roleName);
-                } else {
-                    skippedCount++;
-                }
-            } else {
-                notFoundCount++;
-                log.warn("[RoleService] WARN - Permission '{}' not found for role '{}'", permissionName, roleName);
+                });
             }
         }
-        
-        log.info("[RoleService] INFO - Role '{}' permissions: {} assigned, {} skipped (already exist), {} not found", 
-                roleName, assignedCount, skippedCount, notFoundCount);
     }
 }
 

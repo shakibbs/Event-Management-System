@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: event-management-backend
+    runtime: docker
+    plan: starter
+    
+    # Environment variables set via Render dashboard will be automatically available
+    # No need to specify them here; they're injected by Render into the Docker container
+    
+    # Health check configuration
+    healthCheckPath: /swagger-ui.html
+    healthCheckInterval: 30
+
