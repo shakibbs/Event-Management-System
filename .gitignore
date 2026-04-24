@@ -1,3 +1,7 @@
+# Ignore all markdown files except README.md
+*.md
+!README.md
+
 # Ignore frontend_event folder for backend-only repo
 frontend_event/
 
@@ -5,3 +9,4 @@ frontend_event/
 target/
 *.class
 *.jar
+
